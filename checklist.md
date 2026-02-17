@@ -1,0 +1,5 @@
+- creare sw timers per periodo e per deadline (per ogni task)
+- terminare logging
+- creare test 
+- (opzionale) framework python per configurare il progetto
+- creare handle per errori (?)

@@ -100,6 +100,7 @@ SOURCE_FILES += $(DEMO_PROJECT)/uart.c
 
 # Primitives
 SOURCE_FILES += $(KERNEL_DIR)/queue.c
+SOURCE_FILES += $(KERNEL_DIR)/timers.c
 
 # Start-up code
 SOURCE_FILES += ./startup.c

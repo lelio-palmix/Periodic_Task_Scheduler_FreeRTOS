@@ -57,14 +57,14 @@ typedef struct
     uint64_t offset_ms;
 } TaskConfig;
 
-struct
+typedef struct
 {
     int policy;
     int trace_enabled;
     int max_tasks;
     TaskConfig *tasks;
     int num_tasks;
-} typedef SchedulerConfig;
+}  SchedulerConfig;
 
 void Task_Function(void *params)
 {
@@ -137,7 +137,11 @@ void LoggingTask(void *params)
     {
         if (xQueueReceive(logQueue, &logMessage, portMAX_DELAY) != pdPASS)
         {
-            // TODO: Log messagge somewhere, idk where
+            UART_printf("Failed to receive log message!");
+        }
+        else
+        {
+            UART_printf(logMessage);
         }
     }
 }

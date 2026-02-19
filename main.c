@@ -26,9 +26,9 @@
 #define TASK_RUNNING 1
 #define TASK_NOT_RUNNING 2
 
-QueueHandle_t logQueue;
+volatile QueueHandle_t logQueue;
 
-SemaphoreHandle_t xSemaphore;
+volatile SemaphoreHandle_t xSemaphore;
 
 // TODO: create dedicated hook functions to handle all errors(?)
 
@@ -42,7 +42,7 @@ typedef struct
     int k; //keeps track of job releases
 } TaskState;
 
-TaskState taskState[8];
+volatile TaskState taskState[8];
 
 typedef struct
 {
@@ -52,9 +52,9 @@ typedef struct
     void *params;
     configSTACK_DEPTH_TYPE stackDepth;
     UBaseType_t uxPriority;
-    uint64_t period_ms;
-    uint64_t deadline;
-    uint64_t offset_ms;
+    int period_ms;
+    int deadline;
+    int offset_ms;
 } TaskConfig;
 
 typedef struct
@@ -69,11 +69,10 @@ typedef struct
 void Task_Function(void *params)
 {
 
-    const TaskConfig taskConfig = *((TaskConfig *)params);
+    TaskConfig taskConfig = *((TaskConfig *)params);
 
     TickType_t xLastWakeUpTime;
     TickType_t xLastJobCompleted;
-
     char logMessage[MESSAGE_LENGTH];
     char taskName[configMAX_TASK_NAME_LEN];
     sprintf(taskName, "%s", taskConfig.name);
@@ -81,6 +80,9 @@ void Task_Function(void *params)
     sprintf(errorQueueSend, "Failed to send log - Task %s", taskName);
 
     const TickType_t xPeriod = pdMS_TO_TICKS(taskConfig.period_ms);
+    char periodMessage[MESSAGE_LENGTH];
+    sprintf(periodMessage, "Task %s offset_ms: %lu ticks \n", taskName, xPeriod);
+    UART_printf(periodMessage);
     const TickType_t xDeadline = pdMS_TO_TICKS(taskConfig.deadline);
     const TickType_t xOffset = pdMS_TO_TICKS(taskConfig.offset_ms);
 
@@ -95,8 +97,9 @@ void Task_Function(void *params)
     }
     while (1)
     {
+        //TODO: FIX xTaskDelayUntil
 
-        xTaskDelayUntil(&xLastWakeUpTime, xPeriod);
+        //xTaskDelayUntil(&xLastWakeUpTime, xPeriod);
 
         if( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE )
         {
@@ -146,22 +149,22 @@ void LoggingTask(void *params)
     }
 }
 
-void Init(const SchedulerConfig sconfig)
+void Init(const SchedulerConfig* sconfig)
 {
 
-    globalPolicy = sconfig.policy;
-    if (sconfig.num_tasks > sconfig.max_tasks)
+    globalPolicy = sconfig->policy;
+    if (sconfig->num_tasks > sconfig->max_tasks)
     {
         // TODO: Raise error "Number of tasks exceeds maximum number defined"
     }
 
-    for (int i = 0; i < sconfig.num_tasks; i++)
+    for (int i = 0; i < sconfig->num_tasks; i++)
     {
         // TODO: add a check if sconfig.tasks is NULL
-        TaskConfig *task = (sconfig.tasks + i);
-
+        TaskConfig *task = (sconfig->tasks + i);
         if (task->deadline <= 0)
         {
+            
             task->deadline = task->period_ms;
         }
         task->idTask = i;
@@ -191,22 +194,61 @@ void Init(const SchedulerConfig sconfig)
 
     vTaskStartScheduler();
 };
+void TaskTest_wrap(void *params)
+{
+    (void)params;
+    UART_printf("Hello from TaskTest! \n");
 
+}   
 int main(void)
 {
 
     UART_init();
     // create queue for storing pointers of logging messages
     logQueue = xQueueCreate(QUEUE_LENGTH, sizeof(char) * MESSAGE_LENGTH);
+    TaskConfig task1 = {
+        .name = "Task1",
+        .idTask = 0,
+        .taskBody = TaskTest_wrap, 
+        .params = NULL, // TODO: add params if necessary
+        .stackDepth = DEFAULT_STACK_SIZE,
+        .uxPriority = 5,
+        .period_ms = 3,
+        .deadline = 1,
+        .offset_ms = 0
+    };
+    TaskConfig task2 = {
+        .name = "Task2",
+        .idTask = 1,
+        .taskBody = TaskTest_wrap,  
+        .params = NULL, // TODO: add params if necessary
+        .stackDepth = DEFAULT_STACK_SIZE,
+        .uxPriority = 5,
+        .period_ms = 3,
+        .deadline = 1,
+        .offset_ms = 0
+    };
+    TaskConfig task3 = {
+        .name = "Task3",
+        .idTask = 2,
+        .taskBody = TaskTest_wrap,  
+        .params = NULL, // TODO: add params if necessary
+        .stackDepth = DEFAULT_STACK_SIZE,
+        .uxPriority = 5,
+        .period_ms = 2,
+        .deadline = 1,
+        .offset_ms = 0
+    };
+    TaskConfig tasks[] = {task1, task2, task3};
 
     SchedulerConfig sconfig =
         {.policy = POLICY_SKIP,
          .trace_enabled = 1,
          .max_tasks = MAX_TASKS,
-         .tasks = NULL,
-         .num_tasks = 0};
+         .tasks = tasks,
+         .num_tasks = 3};
 
-    Init(sconfig);
+    Init(&sconfig);
 
     while (1);
 }

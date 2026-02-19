@@ -39,11 +39,12 @@ typedef struct
 {
     TaskHandle_t task;
     int state;
+    int k; //keeps track of job releases
 } TaskState;
 
 TaskState taskState[8];
 
-struct
+typedef struct
 {
     char *name;
     int idTask;
@@ -53,7 +54,8 @@ struct
     UBaseType_t uxPriority;
     uint64_t period_ms;
     uint64_t deadline;
-} typedef TaskConfig;
+    uint64_t offset_ms;
+} TaskConfig;
 
 struct
 {
@@ -79,22 +81,20 @@ void Task_Function(void *params)
     sprintf(errorQueueSend, "Failed to send log - Task %s", taskName);
 
     const TickType_t xPeriod = pdMS_TO_TICKS(taskConfig.period_ms);
-
     const TickType_t xDeadline = pdMS_TO_TICKS(taskConfig.deadline);
+    const TickType_t xOffset = pdMS_TO_TICKS(taskConfig.offset_ms);
+
     void (*functionBody)(void *) = taskConfig.taskBody;
 
     const int idTask = taskConfig.idTask;
 
     xLastWakeUpTime = xTaskGetTickCount();
+
+    if (xOffset>0) {
+        vTaskDelay(pdMS_TO_TICKS(xOffset));
+    }
     while (1)
     {
-
-        // TODO: Add a overrun check here or with a timer
-        if( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE )
-        {
-        taskState[idTask].state = TASK_NOT_RUNNING;
-        xSemaphoreGive( xSemaphore );
-        }
 
         xTaskDelayUntil(&xLastWakeUpTime, xPeriod);
 
@@ -107,6 +107,13 @@ void Task_Function(void *params)
         // Call function defined by the user
         functionBody(taskConfig.params);
 
+        // TODO: Add a overrun check here or with a timer
+        if( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE )
+        {
+            taskState[idTask].state = TASK_NOT_RUNNING;
+            taskState[idTask].k++;
+            xSemaphoreGive( xSemaphore );
+        }
         // Check if there is a deadline miss
         xLastJobCompleted = xTaskGetTickCount();
         if (xLastJobCompleted > xLastWakeUpTime + xDeadline)
@@ -164,8 +171,9 @@ void Init(const SchedulerConfig sconfig)
 
         // TODO: Remember to add TaskHandle_t of the created task so that inside an hypothetical timer it's possible to
         //       suspend/kill if necessary
-        taskState[i].task = xTaskCreate(Task_Function, task->name, task->stackDepth, task, task->uxPriority, NULL);
+        xTaskCreate(Task_Function, task->name, task->stackDepth, task, task->uxPriority, &taskState[i].task);
         taskState[i].state = TASK_NOT_RUNNING;
+        taskState[i].k = 0;
     }
 
     /* Create a mutex type semaphore. */
@@ -196,6 +204,5 @@ int main(void)
 
     Init(sconfig);
 
-    while (1)
-        ;
+    while (1);
 }

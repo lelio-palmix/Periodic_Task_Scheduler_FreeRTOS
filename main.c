@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include "delay.h"
 
 #define MAX_WAIT portMAX_DELAY
 #define QUEUE_LENGTH 15
@@ -77,12 +78,12 @@ void Task_Function(void *params)
     char taskName[configMAX_TASK_NAME_LEN];
     sprintf(taskName, "%s", taskConfig.name);
     char errorQueueSend[MESSAGE_LENGTH];
-    sprintf(errorQueueSend, "Failed to send log - Task %s", taskName);
+    //sprintf(errorQueueSend, "Failed to send log - Task %s", taskName);
 
     const TickType_t xPeriod = pdMS_TO_TICKS(taskConfig.period_ms);
     char periodMessage[MESSAGE_LENGTH];
-    sprintf(periodMessage, "Task %s period: %lu ticks \n", taskName, xPeriod);
-    UART_printf(periodMessage);
+    //sprintf(periodMessage, "Task %s period: %lu ticks \n", taskName, xPeriod);
+    //UART_printf(periodMessage);
     const TickType_t xDeadline = pdMS_TO_TICKS(taskConfig.deadline);
     const TickType_t xOffset = pdMS_TO_TICKS(taskConfig.offset_ms);
 
@@ -90,7 +91,7 @@ void Task_Function(void *params)
 
     const int idTask = taskConfig.idTask;
 
-    xLastWakeUpTime = xTaskGetTickCount();
+    xLastWakeUpTime = 0;
 
     if (xOffset>0) {
         vTaskDelay(pdMS_TO_TICKS(xOffset));
@@ -99,7 +100,7 @@ void Task_Function(void *params)
     {
         //TODO: FIX xTaskDelayUntil
 
-        //xTaskDelayUntil(&xLastWakeUpTime, xPeriod);
+        
 
         if( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE )
         {
@@ -107,8 +108,17 @@ void Task_Function(void *params)
         xSemaphoreGive( xSemaphore );
         }
 
+        //print start time
+        sprintf(logMessage, "Task %s START:[%lu] \n", taskName, xTaskGetTickCount());
+        UART_printf( logMessage);
+
         // Call function defined by the user
         functionBody(taskConfig.params);
+
+        //print end time
+        xLastJobCompleted = xTaskGetTickCount();
+        sprintf(logMessage, "Task %s END:[%lu] \n", taskName, xLastJobCompleted);
+        UART_printf( logMessage);
 
         // TODO: Add a overrun check here or with a timer
         if( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE )
@@ -117,8 +127,8 @@ void Task_Function(void *params)
             taskState[idTask].k++;
             xSemaphoreGive( xSemaphore );
         }
+       
         // Check if there is a deadline miss
-        xLastJobCompleted = xTaskGetTickCount();
         if (xLastJobCompleted > xLastWakeUpTime + xDeadline)
         {
             // Log deadline miss
@@ -128,6 +138,7 @@ void Task_Function(void *params)
                 UART_printf(errorQueueSend);
             }
         }
+        xTaskDelayUntil(&xLastWakeUpTime, xPeriod);
     }
 }
 
@@ -183,6 +194,7 @@ void Init( const SchedulerConfig (sconfig))
         taskState[i].k = 0;
     }
 
+    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 1, NULL);
     /* Create a mutex type semaphore. */
     xSemaphore = xSemaphoreCreateMutex();
 
@@ -206,19 +218,20 @@ void TaskTest_wrap(void *params)
         UART_printf("Hello from Unknown Task!\n");
         return;
     }
-
+    //delay_routine_2(1000000000);
+    
     
     char buffer[MESSAGE_LENGTH]; 
     
 
-    snprintf(buffer, MESSAGE_LENGTH, "\nHello from %s!", taskName);
+    snprintf(buffer, MESSAGE_LENGTH, "\nHello from %s!\n", taskName);
 
 
     UART_printf(buffer);
 }
 // Global array to store task configurations, garantee that the pointer to the task configuration passed to the
 // task function is valid for the entire execution of the program
-volatile TaskConfig tasks[MAX_TASKS];
+
 int main(void)
 {
     UART_init();
@@ -231,8 +244,8 @@ int main(void)
         .params = (void* )"Task1", // TODO: add params if necessary
         .stackDepth = DEFAULT_STACK_SIZE,
         .uxPriority = 1,
-        .period_ms = 10,
-        .deadline = 5,
+        .period_ms = 30,
+        .deadline = 10,
         .offset_ms = 0
     };
     TaskConfig task2 = {
@@ -242,8 +255,8 @@ int main(void)
         .params = (void* )"Task2", // TODO: add params if necessary
         .stackDepth = DEFAULT_STACK_SIZE,
         .uxPriority = 1,
-        .period_ms = 10,
-        .deadline = 5,
+        .period_ms = 50,
+        .deadline = 10,
         .offset_ms = 0
     };
     TaskConfig task3 = {
@@ -253,15 +266,16 @@ int main(void)
         .params = (void* )"Task3", // TODO: add params if necessary
         .stackDepth = DEFAULT_STACK_SIZE,
         .uxPriority = 1,
-        .period_ms = 10,
-        .deadline = 5,
+        .period_ms = 60,
+        .deadline = 30,
         .offset_ms = 0
     };
+    TaskConfig tasks[MAX_TASKS];
     tasks[0] = task1;
     tasks[1] = task2;
     tasks[2] = task3;
 
-      
+    //TaskConfig tasks[] = {task1, task2, task3};
         
     SchedulerConfig sconfig =
         {.policy = POLICY_SKIP,

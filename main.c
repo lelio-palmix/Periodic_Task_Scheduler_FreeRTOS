@@ -81,7 +81,7 @@ void Task_Function(void *params)
 
     const TickType_t xPeriod = pdMS_TO_TICKS(taskConfig.period_ms);
     char periodMessage[MESSAGE_LENGTH];
-    sprintf(periodMessage, "Task %s offset_ms: %lu ticks \n", taskName, xPeriod);
+    sprintf(periodMessage, "Task %s period: %lu ticks \n", taskName, xPeriod);
     UART_printf(periodMessage);
     const TickType_t xDeadline = pdMS_TO_TICKS(taskConfig.deadline);
     const TickType_t xOffset = pdMS_TO_TICKS(taskConfig.offset_ms);
@@ -149,19 +149,19 @@ void LoggingTask(void *params)
     }
 }
 
-void Init(const SchedulerConfig* sconfig)
+void Init( const SchedulerConfig (sconfig))
 {
 
-    globalPolicy = sconfig->policy;
-    if (sconfig->num_tasks > sconfig->max_tasks)
+    globalPolicy = sconfig.policy;
+    if (sconfig.num_tasks > sconfig.max_tasks)
     {
         // TODO: Raise error "Number of tasks exceeds maximum number defined"
     }
 
-    for (int i = 0; i < sconfig->num_tasks; i++)
+    for (int i = 0; i < sconfig.num_tasks; i++)
     {
         // TODO: add a check if sconfig.tasks is NULL
-        TaskConfig *task = (sconfig->tasks + i);
+        TaskConfig *task = (sconfig.tasks + i);
         if (task->deadline <= 0)
         {
             
@@ -178,7 +178,7 @@ void Init(const SchedulerConfig* sconfig)
 
         // TODO: Remember to add TaskHandle_t of the created task so that inside an hypothetical timer it's possible to
         //       suspend/kill if necessary
-        xTaskCreate(Task_Function, task->name, task->stackDepth, task, task->uxPriority, &taskState[i].task);
+        xTaskCreate(Task_Function, task->name, task->stackDepth, task, task->uxPriority,(TaskHandle_t *)&taskState[i].task);
         taskState[i].state = TASK_NOT_RUNNING;
         taskState[i].k = 0;
     }
@@ -194,15 +194,33 @@ void Init(const SchedulerConfig* sconfig)
 
     vTaskStartScheduler();
 };
+
+
 void TaskTest_wrap(void *params)
 {
-    (void)params;
-    UART_printf("Hello from TaskTest! \n");
+    char *taskName = (char *)params;
 
-}   
+   
+    if (taskName == NULL)
+    {
+        UART_printf("Hello from Unknown Task!\n");
+        return;
+    }
+
+    
+    char buffer[MESSAGE_LENGTH]; 
+    
+
+    snprintf(buffer, MESSAGE_LENGTH, "\nHello from %s!", taskName);
+
+
+    UART_printf(buffer);
+}
+// Global array to store task configurations, garantee that the pointer to the task configuration passed to the
+// task function is valid for the entire execution of the program
+volatile TaskConfig tasks[MAX_TASKS];
 int main(void)
 {
-
     UART_init();
     // create queue for storing pointers of logging messages
     logQueue = xQueueCreate(QUEUE_LENGTH, sizeof(char) * MESSAGE_LENGTH);
@@ -210,45 +228,49 @@ int main(void)
         .name = "Task1",
         .idTask = 0,
         .taskBody = TaskTest_wrap, 
-        .params = NULL, // TODO: add params if necessary
+        .params = (void* )"Task1", // TODO: add params if necessary
         .stackDepth = DEFAULT_STACK_SIZE,
-        .uxPriority = 5,
-        .period_ms = 3,
-        .deadline = 1,
+        .uxPriority = 1,
+        .period_ms = 10,
+        .deadline = 5,
         .offset_ms = 0
     };
     TaskConfig task2 = {
         .name = "Task2",
         .idTask = 1,
         .taskBody = TaskTest_wrap,  
-        .params = NULL, // TODO: add params if necessary
+        .params = (void* )"Task2", // TODO: add params if necessary
         .stackDepth = DEFAULT_STACK_SIZE,
-        .uxPriority = 5,
-        .period_ms = 3,
-        .deadline = 1,
+        .uxPriority = 1,
+        .period_ms = 10,
+        .deadline = 5,
         .offset_ms = 0
     };
     TaskConfig task3 = {
         .name = "Task3",
         .idTask = 2,
         .taskBody = TaskTest_wrap,  
-        .params = NULL, // TODO: add params if necessary
+        .params = (void* )"Task3", // TODO: add params if necessary
         .stackDepth = DEFAULT_STACK_SIZE,
-        .uxPriority = 5,
-        .period_ms = 2,
-        .deadline = 1,
+        .uxPriority = 1,
+        .period_ms = 10,
+        .deadline = 5,
         .offset_ms = 0
     };
-    TaskConfig tasks[] = {task1, task2, task3};
+    tasks[0] = task1;
+    tasks[1] = task2;
+    tasks[2] = task3;
 
+      
+        
     SchedulerConfig sconfig =
         {.policy = POLICY_SKIP,
          .trace_enabled = 1,
          .max_tasks = MAX_TASKS,
-         .tasks = tasks,
+         .tasks =  tasks,
          .num_tasks = 3};
 
-    Init(&sconfig);
+    Init(sconfig);
 
     while (1);
 }

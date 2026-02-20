@@ -218,7 +218,7 @@ void TaskTest_wrap(void *params)
         UART_printf("Hello from Unknown Task!\n");
         return;
     }
-    //delay_routine_2(1000000000);
+    delay_routine(100);
     
     
     char buffer[MESSAGE_LENGTH]; 

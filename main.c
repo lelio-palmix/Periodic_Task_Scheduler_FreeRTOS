@@ -33,9 +33,13 @@
 
 // By default, use SKIP globally
 
+// Global array to store task configurations, garantee that the pointer to the task configuration passed to the
+// task function is valid for the entire execution of the program
 volatile QueueHandle_t logQueue;
 volatile SemaphoreHandle_t xSemaphore;
 volatile TaskState taskState[MAX_TASKS];
+
+
 
 void TaskTest_wrap(void *params)
 {
@@ -58,8 +62,7 @@ void TaskTest_wrap(void *params)
 
     UART_printf(buffer);
 }
-// Global array to store task configurations, garantee that the pointer to the task configuration passed to the
-// task function is valid for the entire execution of the program
+
 
 int main(void)
 {

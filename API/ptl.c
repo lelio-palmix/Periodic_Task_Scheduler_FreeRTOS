@@ -6,6 +6,21 @@
 #include "ptl.h"
 
 
+void vApplicationTickHook(void){
+
+    for(int i = 0; i < MAX_TASKS; i++){
+        if(taskState[i].task != NULL){
+            //check beginning of new cycle            
+            TickType_t startNext = taskState[i].startTime + pdMS_TO_TICKS(taskState[i].period_ms)  ; 
+            TickType_t currentExecutionTime = xTaskGetTickCount();    
+            if(startNext < currentExecutionTime) {
+                //vTaskDelete(taskState[i].task);
+            }
+        }
+    }
+    
+}
+
 void Task_Function(void *params)
 {
 
@@ -38,31 +53,32 @@ void Task_Function(void *params)
     }
     while (1)
     {
-        //TODO: FIX xTaskDelayUntil
-
-        
-
         if( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE )
         {
         taskState[idTask].state = TASK_RUNNING;
+        taskState[idTask].startTime = xTaskGetTickCount(); 
+        taskState[idTask].deadline = taskConfig.deadline;
+        taskState[idTask].period_ms = taskConfig.period_ms;
         xSemaphoreGive( xSemaphore );
-        }
-
-        //print start time
-        sprintf(logMessage, "Task %s START:[%lu] \n", taskName, xTaskGetTickCount());
+        sprintf(logMessage, "Task %s START:[%lu] \n", taskName, taskState[idTask].startTime);
         UART_printf( logMessage);
+
+        }
 
         // Call function defined by the user
         functionBody(taskConfig.params);
 
-        //print end time
+        //print end time 
+        // no use sprintf in task
         xLastJobCompleted = xTaskGetTickCount();
+        
         sprintf(logMessage, "Task %s END:[%lu] \n", taskName, xLastJobCompleted);
         UART_printf( logMessage);
 
         // TODO: Add a overrun check here or with a timer
         if( xSemaphoreTake( xSemaphore, portMAX_DELAY ) == pdTRUE )
         {
+            taskState[idTask].finishTime = xLastJobCompleted;
             taskState[idTask].state = TASK_NOT_RUNNING;
             taskState[idTask].k++;
             xSemaphoreGive( xSemaphore );
@@ -85,6 +101,7 @@ void Task_Function(void *params)
 void LoggingTask(void *params)
 {
     // TODO: decide if it's better to compose the string of the message inside the LoggingTask or keep it as it is already
+    
     (void)params;
     char logMessage[MESSAGE_LENGTH];
     while (1)

@@ -33,6 +33,11 @@ typedef struct
     int state;
     int k; //keeps track of job releases
     int policy;
+    int executionTime;
+    TickType_t startTime;
+    TickType_t finishTime;
+    int deadline;
+    int period_ms;
 } TaskState;
 
 typedef struct

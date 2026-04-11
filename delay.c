@@ -2,12 +2,16 @@
 #include "delay.h"
 #include "task.h"
 
-// This function will block the calling task for the specified number of milliseconds
-void delay_routine(unsigned int milliseconds) {
+// This function simulates a busy-waiting loop for a specified duration in milliseconds
+void delay_routine(unsigned int milliseconds) 
+{
+    TickType_t startTick = xTaskGetTickCount();
+    TickType_t delayTicks = pdMS_TO_TICKS(milliseconds);
 
-    TickType_t target = xTaskGetTickCount() + pdMS_TO_TICKS(milliseconds);
-
-    while(xTaskGetTickCount()< target){}
-
+    // Busy-wait until the specified time has expired
+    while ((xTaskGetTickCount() - startTick) < delayTicks) 
+    {
+        // We use NOP to prevent compiler optimizations that might remove the empty loop
+        __asm volatile("nop"); 
+    }
 }
-

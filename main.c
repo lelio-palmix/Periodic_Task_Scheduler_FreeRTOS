@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "FreeRTOS.h"
 #include "task.h"
 #include "uart.h"
@@ -23,6 +21,7 @@ int main(void)
 {
     UART_init();
     
+    /* Task configuration */
     TaskConfig task1 = {
         .name = "TaskA",
         .idTask = 0,
@@ -64,6 +63,7 @@ int main(void)
     tasks[1] = task2;
     tasks[2] = task3;
 
+    /* Scheduler configuration */
     SchedulerConfig sconfig = {
          .policy = POLICY_SKIP,
          .trace_enabled = 1,
@@ -72,6 +72,7 @@ int main(void)
          .num_tasks = 3
     };
 
+    /* Call the initialization function for PTL scheduler */
     Init(sconfig);
 
     while (1);

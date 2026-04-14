@@ -65,7 +65,7 @@ int main(void)
 
     /* Scheduler configuration */
     SchedulerConfig sconfig = {
-         .policy = POLICY_SKIP,
+         .policy = POLICY_KILL,
          .trace_enabled = 1,
          .max_tasks = MAX_TASKS,
          .tasks = tasks,

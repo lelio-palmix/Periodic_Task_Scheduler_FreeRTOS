@@ -84,6 +84,7 @@ typedef struct
     TickType_t startTime;
     TickType_t finishTime;
     TickType_t lastReleaseTime; // used by TickHook to track expected releases
+    TickType_t xLastWakeUpTime;
     uint32_t period_ms;
     uint32_t deadline;
     uint32_t k;
@@ -131,5 +132,6 @@ BaseType_t PTL_IsOverrun(TickType_t xLastWakeUpTime, TickType_t xPeriod, TickTyp
  * Returns the number of releases that were skipped due to the overrun.
  */
 UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow);
-
+UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow, TaskConfig *taskConfig,int taskId);
+void Task_Function(void *params);
 #endif

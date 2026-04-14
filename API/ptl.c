@@ -96,7 +96,7 @@ void Task_Function(void *params)
 {
     TaskConfig taskConfig = *((TaskConfig *)params);
 
-    TickType_t xLastWakeUpTime;
+    //TickType_t xLastWakeUpTime;
     TickType_t xLastJobCompleted;
     LogEvent ev;
 
@@ -112,7 +112,7 @@ void Task_Function(void *params)
         vTaskDelay(xOffset);
     }
 
-    xLastWakeUpTime = 0;
+    //xLastWakeUpTime = 0;
 
     while (1)
     {
@@ -149,13 +149,13 @@ void Task_Function(void *params)
             xSemaphoreGive(xSemaphore);
         }
 
-        if (xLastJobCompleted > xLastWakeUpTime + xDeadline)
+        if (xLastJobCompleted > taskState[idTask].xLastWakeUpTime + xDeadline)
         {
             /* Deferred logging DEADLINE_MISS */
             ev.timestamp = xLastJobCompleted;
             ev.taskId = idTask;
             ev.eventType = LOG_DEADLINE_MISS;
-            ev.extraData = xLastWakeUpTime + xDeadline;
+            ev.extraData = taskState[idTask].xLastWakeUpTime + xDeadline;
             xQueueSend(logQueue, &ev, (TickType_t)0);
         }
 
@@ -163,7 +163,7 @@ void Task_Function(void *params)
         switch (taskState[idTask].policy)
         {
         case POLICY_SKIP:
-            PTL_ApplySkipPolicy(&xLastWakeUpTime, xPeriod, xLastJobCompleted);
+            PTL_ApplySkipPolicy(&taskState[idTask].xLastWakeUpTime, xPeriod, xLastJobCompleted);
             break;
 
         case POLICY_CATCH_UP:
@@ -171,14 +171,14 @@ void Task_Function(void *params)
             break;
 
         case POLICY_KILL:
-            /* Not implemented yet. */
+            PTL_ApplyKillPolicy(&taskState[idTask].xLastWakeUpTime, xPeriod, xLastJobCompleted, &taskConfig, idTask);
             break;
         default:
             break;
         }
 
         /* Delay task until next release time */
-        xTaskDelayUntil(&xLastWakeUpTime, xPeriod);
+        xTaskDelayUntil(&taskState[idTask].xLastWakeUpTime, xPeriod);
     }
 }
 
@@ -266,6 +266,7 @@ void Init(const SchedulerConfig sconfig)
         taskState[i].period_ms = task->period_ms;
         taskState[i].deadline = task->deadline;
         taskState[i].lastReleaseTime = 0;
+        taskState[i].xLastWakeUpTime = 0;
 
         xTaskCreate(Task_Function, task->name, task->stackDepth, task, task->uxPriority, (TaskHandle_t *)&taskState[i].task);
     }

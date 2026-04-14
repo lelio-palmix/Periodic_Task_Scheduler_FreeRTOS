@@ -5,6 +5,8 @@
 volatile QueueHandle_t logQueue;
 volatile SemaphoreHandle_t xSemaphore;
 volatile TaskState taskState[MAX_TASKS];
+//dont save
+volatile SchedulerConfig sconfig_global;
 
 BaseType_t PTL_IsOverrun(TickType_t xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow)
 {
@@ -30,6 +32,25 @@ UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod,
     return skippedReleases;
 }
 
+UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow, int task_id)
+{
+    UBaseType_t skippedReleases = 0U;
+
+    if ((xLastWakeUpTime == NULL) || (xPeriod == 0U))
+    {
+        return 0U;
+    }
+    TaskConfig *task = sconfig_global.tasks + task_id;
+    
+    if (PTL_IsOverrun(*xLastWakeUpTime, xPeriod, xNow) == pdTRUE)
+    {
+        vTaskDelete(task);
+        xTaskCreate(Task_Function, task->name, task->stackDepth, task, task->uxPriority, (TaskHandle_t *)&taskState[i].task);
+
+    }
+
+    return skippedReleases;
+}
 /* ISR for tick-level precision checking of period overruns. */
 void vApplicationTickHook(void)
 {
@@ -206,6 +227,8 @@ void LoggingTask(void *params)
 void Init(const SchedulerConfig sconfig)
 {
     int globalPolicy = sconfig.policy;
+    //dont save
+    sconfig_global = sconfig;
 
     /* Check if the number of tasks exceeds the maximum */
     if (sconfig.num_tasks > sconfig.max_tasks)

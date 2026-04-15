@@ -79,6 +79,7 @@ typedef struct
 {
     TaskHandle_t task;
     char name[configMAX_TASK_NAME_LEN];
+    TaskConfig taskConfig;
     TaskRunningState state;
     TaskPolicy policy;
     TickType_t startTime;

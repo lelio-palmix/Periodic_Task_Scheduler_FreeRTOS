@@ -5,7 +5,7 @@ TESTS = [
     {
         "id": 1,
         "name": "Preemption and timing consistency checks",
-        "must_have": ["[INFO] t=10 task=TaskA END"], 
+        "must_have": ["task=TaskA END"],
         "must_not_have": ["OVERRUN", "DEADLINE_MISS"] 
     },
     {

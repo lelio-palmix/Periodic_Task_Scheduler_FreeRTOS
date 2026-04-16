@@ -1,8 +1,8 @@
-image: alpine:latest
+image: debian:bookworm-slim
 
 before_script:
-  - apk update
-  - apk add make python3 qemu-system-arm gcc-arm-none-eabi newlib-arm-none-eabi
+  - apt-get update -qq
+  - apt-get install -y --no-install-recommends gcc-arm-none-eabi make qemu-system-arm python3
 
 stages:
   - build_and_test

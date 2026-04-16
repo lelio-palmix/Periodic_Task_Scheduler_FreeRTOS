@@ -1,23 +1,16 @@
-image: ubuntu:22.04
+image: alpine:latest
 
-# Before running the script, set up the environment by installing necessary packages.
 before_script:
-  # Update package lists to get the latest versions and dependencies
-  - apt-get update -qq
-  # Install ARM toolchain, Make, QEMU for ARM, and Python 3 for running the test script
-  - apt-get install -y gcc-arm-none-eabi make qemu-system-arm python3
+  - apk update
+  - apk add make python3 qemu-system-arm gcc-arm-none-eabi newlib-arm-none-eabi
 
-# Stages of the CI pipeline for building and testing.
 stages:
   - build_and_test
 
-# Definition of the regression test job
 run_regression_tests:
   stage: build_and_test
   script:
     - echo "========================================================="
     - echo "Starting Regression Tests for PTL Scheduler"
-      - echo "========================================================="
-    # If the script returns sys.exit(0), the job passes
-    # If it returns sys.exit(1), the job fails
+    - echo "========================================================="
     - python3 run_tests.py

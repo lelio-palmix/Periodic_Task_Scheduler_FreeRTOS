@@ -35,7 +35,7 @@ UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod,
     {
         vTaskDelete(task);
         *xLastWakeUpTime = xNow;
-        xTaskCreate(Task_Function, taskConfig->name, taskConfig->stackDepth, task, taskConfig->uxPriority,(TaskHandle_t *) &taskState[taskId].task);
+        xTaskCreate(Task_Function, taskConfig->name, taskConfig->stackDepth, taskConfig, taskConfig->uxPriority,(TaskHandle_t *) &taskState[taskId].task);
 
     }
 
@@ -179,6 +179,79 @@ void Task_Function(void *params)
             taskState[idTask].k++;
             xSemaphoreGive(xSemaphore);
         }
+
+        if (xLastJobCompleted > taskState[idTask].xLastWakeUpTime + xDeadline)
+        {
+            /* Deferred logging DEADLINE_MISS */
+            ev.timestamp = xLastJobCompleted;
+            ev.taskId = idTask;
+            ev.eventType = LOG_DEADLINE_MISS;
+            ev.extraData = taskState[idTask].xLastWakeUpTime + xDeadline;
+            xQueueSend(logQueue, &ev, (TickType_t)0);
+        }
+        /* Delay task until next release time */
+        xTaskDelayUntil(&taskState[idTask].xLastWakeUpTime, xPeriod);
+    }
+}
+
+/* Task function implementation */
+void Task_Function_critical_section(void *params)
+{
+    TaskConfig taskConfig = *((TaskConfig *)params);
+
+    //TickType_t xLastWakeUpTime;
+    TickType_t xLastJobCompleted;
+    LogEvent ev;
+
+    const int idTask = taskConfig.idTask;
+    const TickType_t xPeriod = pdMS_TO_TICKS(taskConfig.period_ms);
+    const TickType_t xDeadline = pdMS_TO_TICKS(taskConfig.deadline);
+    const TickType_t xOffset = pdMS_TO_TICKS(taskConfig.offset_ms);
+
+    void (*functionBody)(void *) = taskConfig.taskBody;
+
+    if (xOffset > 0)
+    {
+        vTaskDelay(xOffset);
+    }
+
+    //xLastWakeUpTime = 0;
+
+    while (1)
+    {
+        //Modifica per utilizzare la critical section invece del semaforo
+        
+        taskENTER_CRITICAL();
+
+        taskState[idTask].state = TASK_RUNNING;
+        taskState[idTask].startTime = xTaskGetTickCount();
+
+        /* Deferred logging START */
+        ev.timestamp = taskState[idTask].startTime;
+        ev.taskId = idTask;
+        ev.eventType = LOG_START;
+        ev.extraData = 0;
+        xQueueSend(logQueue, &ev, (TickType_t)0);
+        taskEXIT_CRITICAL();
+    
+
+        functionBody(taskConfig.params);
+
+        xLastJobCompleted = xTaskGetTickCount();
+
+        /* Deferred logging END */
+        taskENTER_CRITICAL();
+        ev.timestamp = xLastJobCompleted;
+        ev.taskId = idTask;
+        ev.eventType = LOG_END;
+        ev.extraData = 0;
+        xQueueSend(logQueue, &ev, (TickType_t)0);
+        
+        taskState[idTask].finishTime = xLastJobCompleted;
+        taskState[idTask].state = TASK_NOT_RUNNING;
+        taskState[idTask].k++;
+
+        taskEXIT_CRITICAL();
 
         if (xLastJobCompleted > taskState[idTask].xLastWakeUpTime + xDeadline)
         {

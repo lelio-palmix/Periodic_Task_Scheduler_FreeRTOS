@@ -134,5 +134,7 @@ BaseType_t PTL_IsOverrun(TickType_t xLastWakeUpTime, TickType_t xPeriod, TickTyp
  */
 UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow);
 UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow, TaskConfig *taskConfig,int taskId);
+
+void Task_Function_critical_section(void *params);
 void Task_Function(void *params);
 #endif

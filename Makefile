@@ -4,6 +4,9 @@ FREERTOS_ROOT := ./FreeRTOS/FreeRTOS
 # Demo code
 DEMO_PROJECT := .
 
+#API
+API_DIR := ./API
+
 # FreeRTOS kernel
 KERNEL_DIR := $(FREERTOS_ROOT)/Source
 KERNEL_PORT_DIR := $(KERNEL_DIR)/portable/GCC/ARM_CM3
@@ -30,9 +33,11 @@ QEMU_FLAGS_DBG = -s -S
 
 INCLUDE_DIRS = -I$(KERNEL_DIR)/include -I$(KERNEL_PORT_DIR)
 INCLUDE_DIRS += -I$(DEMO_PROJECT)
+INCLUDE_DIRS += -I$(API_DIR)
 
 VPATH += $(KERNEL_DIR) $(KERNEL_PORT_DIR) $(KERNEL_DIR)/portable/MemMang
 VPATH += $(DEMO_PROJECT)
+VPATH += $(API_DIR)
 
 # Include paths. See INCLUDE_DIRS
 CFLAGS = $(INCLUDE_DIRS)
@@ -97,6 +102,8 @@ SOURCE_FILES += $(KERNEL_DIR)/portable/GCC/ARM_CM3/port.c
 # Demo files
 SOURCE_FILES += $(DEMO_PROJECT)/main.c
 SOURCE_FILES += $(DEMO_PROJECT)/uart.c
+SOURCE_FILES += $(DEMO_PROJECT)/delay.c
+SOURCE_FILES += $(API_DIR)/ptl.c
 
 # Primitives
 SOURCE_FILES += $(KERNEL_DIR)/queue.c

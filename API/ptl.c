@@ -8,13 +8,13 @@ volatile TaskState taskState[MAX_TASKS];
 volatile TaskHandle_t interruptTaskHandler;
 
 
-BaseType_t PTL_IsOverrun(TickType_t xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow)
+static inline BaseType_t PTL_IsOverrun(TickType_t xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow)
 {
     TickType_t xNextRelease = xLastWakeUpTime + xPeriod;
     return (xNextRelease <= xNow) ? pdTRUE : pdFALSE; // change < with <=
 }
 
-UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow)
+static inline UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow)
 {
     UBaseType_t skippedReleases = 0U;
 
@@ -27,7 +27,7 @@ UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod,
     return skippedReleases;
 }
 
-UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow, TaskConfig *taskConfig, int taskId)
+static inline UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow, TaskConfig *taskConfig, int taskId)
 {
     TaskHandle_t task = taskState[taskId].task;
 

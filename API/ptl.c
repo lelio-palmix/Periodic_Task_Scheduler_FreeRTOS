@@ -45,12 +45,12 @@ void vApplicationTickHook(void)
 
     for (int i = 0; i < MAX_TASKS; i++)
     {
-        TickType_t period = pdMS_TO_TICKS(taskState[i].period);
+        const TickType_t period = taskState[i].period;
         if (taskState[i].task != NULL)
         {
 
             const TickType_t deadline = taskState[i].xLastWakeUpTime + taskState[i].deadline;
-            if ( taskState[i].lastKDeadlineMiss != taskState[i].k && taskState[i].state == TASK_RUNNING && deadline > currentTick)
+            if ( taskState[i].lastKDeadlineMiss != taskState[i].k && taskState[i].state == TASK_RUNNING && deadline <= currentTick)
             {
                 taskState[i].lastKDeadlineMiss = taskState[i].k;
                 /* Deferred logging DEADLINE_MISS */
@@ -59,14 +59,14 @@ void vApplicationTickHook(void)
                 ev.taskId = i;
                 ev.eventType = LOG_DEADLINE_MISS;
                 ev.extraData = 0;
-                xQueueSend(logQueue, &ev, 0);
+                xQueueSendFromISR(logQueue, &ev, 0);
             }
 
-            TickType_t nextRelease = taskState[i].xLastWakeUpTime + period;
+            const TickType_t nextRelease = taskState[i].xLastWakeUpTime + period;
             if (nextRelease  <= currentTick && taskState[i].state == TASK_RUNNING)
             {
                 taskState[i].xLastWakeUpTime = nextRelease;
-
+                taskState[i].k++;
                 /* Log overrun event based on the task's policy */
 
                 /*
@@ -282,7 +282,7 @@ void LoggingTask(void *params)
                 snprintf(buffer, MESSAGE_LENGTH, "[INFO] t=%lu task=%s END\n", (unsigned long)ev.timestamp, name);
                 break;
             case LOG_DEADLINE_MISS:
-                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s DEADLINE_MISS", (unsigned long)ev.timestamp, name);
+                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s DEADLINE_MISS\n", (unsigned long)ev.timestamp, name);
                 break;
             case LOG_OVERRUN_SKIP:
                 snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> SKIP\n", (unsigned long)ev.timestamp, name);

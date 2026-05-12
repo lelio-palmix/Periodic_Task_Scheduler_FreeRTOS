@@ -5,13 +5,7 @@
 // This function simulates a busy-waiting loop for a specified duration in milliseconds
 void delay_routine(unsigned int milliseconds) 
 {
-    TickType_t startTick = xTaskGetTickCount();
-    TickType_t delayTicks = pdMS_TO_TICKS(milliseconds);
+    volatile unsigned long counter = milliseconds * (configCPU_CLOCK_HZ/1000); // compute number of cycles based on CPU clock
+    while (counter--) __asm volatile("nop");
 
-    // Busy-wait until the specified time has expired
-    while ((xTaskGetTickCount() - startTick) < delayTicks) 
-    {
-        // We use NOP to prevent compiler optimizations that might remove the empty loop
-        __asm volatile("nop"); 
-    }
 }

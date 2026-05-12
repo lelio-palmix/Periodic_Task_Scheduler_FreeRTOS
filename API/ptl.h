@@ -84,11 +84,11 @@ typedef struct
     TaskPolicy policy;
     TickType_t startTime;
     TickType_t finishTime;
-    TickType_t lastReleaseTime; // used by TickHook to track expected releases
     TickType_t xLastWakeUpTime;
-    uint32_t period_ms;
-    uint32_t deadline;
+    TickType_t period;
+    TickType_t deadline;
     uint32_t k;
+    uint32_t lastKDeadlineMiss;
 } TaskState;
 
 /* Scheduler configuration structure */

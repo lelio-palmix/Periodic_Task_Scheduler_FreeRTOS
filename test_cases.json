@@ -1,0 +1,49 @@
+{
+  "tests": [
+    {
+      "id": 1,
+      "name": "Preemption and timing consistency checks",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {"name": "TaskA", "id": 0, "workload": 10, "priority": 3, "period": 30, "deadline": 30},
+        {"name": "TaskB", "id": 1, "workload": 25, "priority": 2, "period": 50, "deadline": 50}
+      ],
+      "must_have": ["task=TaskA END", "task=TaskB END"],
+      "must_not_have": ["OVERRUN", "DEADLINE_MISS"]
+    },
+    {
+      "id": 2,
+      "name": "Stress Test (Overlapping HRT) - Policy SKIP",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {"name": "TaskA", "id": 0, "workload": 40, "priority": 3, "period": 30, "deadline": 15},
+        {"name": "TaskB", "id": 1, "workload": 10, "priority": 2, "period": 50, "deadline": 50}
+      ],
+      "must_have": ["OVERRUN -> SKIP", "DEADLINE_MISS"],
+      "must_not_have": ["CATCH_UP"]
+    },
+    {
+      "id": 3,
+      "name": "Stress Test (Overlapping HRT) - Policy CATCH_UP",
+      "policy": "POLICY_CATCH_UP",
+      "tasks": [
+        {"name": "TaskA", "id": 0, "workload": 40, "priority": 3, "period": 30, "deadline": 15},
+        {"name": "TaskB", "id": 1, "workload": 10, "priority": 2, "period": 50, "deadline": 50}
+      ],
+      "must_have": ["OVERRUN -> CATCH_UP", "DEADLINE_MISS"],
+      "must_not_have": ["SKIP"]
+    },
+    {
+      "id": 4,
+      "name": "Edge-case tests (Minimal time gaps)",
+      "policy": "POLICY_CATCH_UP",
+      "tasks": [
+        {"name": "TaskA", "id": 0, "workload": 10, "priority": 3, "period": 15, "deadline": 15},
+        {"name": "TaskB", "id": 1, "workload": 10, "priority": 2, "period": 20, "deadline": 20},
+        {"name": "TaskC", "id": 2, "workload": 10, "priority": 1, "period": 30, "deadline": 30}
+      ],
+      "must_have": ["START"],
+      "must_not_have": []
+    }
+  ]
+}

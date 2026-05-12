@@ -4,7 +4,7 @@
 
 volatile QueueHandle_t logQueue;
 volatile SemaphoreHandle_t xSemaphore;
-volatile TaskState taskState[MAX_TASKS];
+TaskState taskState[MAX_TASKS];
 volatile TaskHandle_t interruptTaskHandler;
 
 
@@ -14,17 +14,18 @@ inline BaseType_t PTL_IsOverrun(TickType_t xLastWakeUpTime, TickType_t xPeriod, 
     return (xNextRelease <= xNow) ? pdTRUE : pdFALSE; // change < with <=
 }
 
-inline UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow)
+inline UBaseType_t PTL_ApplySkipPolicy()
 {
-    UBaseType_t skippedReleases = 0U;
+    //TODO: Understand what to do here
+    //UBaseType_t skippedReleases = 0U;
 
-    *xLastWakeUpTime += xPeriod;
-    skippedReleases++;
-
-    return skippedReleases;
+    //*xLastWakeUpTime += xPeriod;
+    //skippedReleases++;
+    //return skippedReleases;
+    return 1;
 }
 
-inline UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow, TaskConfig *taskConfig, int taskId)
+inline UBaseType_t PTL_ApplyKillPolicy(volatile TaskConfig *taskConfig, int taskId)
 {
     TaskHandle_t task = taskState[taskId].task;
 
@@ -96,7 +97,6 @@ void Interrupt_task(void *params){
             int id = (int)ulReceivedValue;
             LogEvent ev;
             TickType_t currentTick = xTaskGetTickCount();
-            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
             ev.timestamp = currentTick;
             ev.taskId = id;
             ev.extraData = 0;
@@ -105,7 +105,7 @@ void Interrupt_task(void *params){
             {
             case POLICY_SKIP:
                 ev.eventType = LOG_OVERRUN_SKIP;
-                PTL_ApplySkipPolicy(&taskState[id].xLastWakeUpTime,taskState[id].period,currentTick);
+                PTL_ApplySkipPolicy();
                 break;
             case POLICY_CATCH_UP:
                 ev.eventType = LOG_OVERRUN_CATCHUP;
@@ -114,7 +114,7 @@ void Interrupt_task(void *params){
             case POLICY_KILL:
                 ev.eventType = LOG_OVERRUN_KILL;
                 
-                PTL_ApplyKillPolicy(&taskState[id].xLastWakeUpTime, taskState[id].period, currentTick, &taskState[id].taskConfig,id);
+                PTL_ApplyKillPolicy(&taskState[id].taskConfig,id);
                 break;               
             default: break;    
             }
@@ -209,7 +209,6 @@ void Task_Function_critical_section(void *params)
 
     const int idTask = taskConfig.idTask;
     const TickType_t xPeriod = pdMS_TO_TICKS(taskConfig.period_ms);
-    const TickType_t xDeadline = pdMS_TO_TICKS(taskConfig.deadline);
     const TickType_t xOffset = pdMS_TO_TICKS(taskConfig.offset_ms);
 
     void (*functionBody)(void *) = taskConfig.taskBody;
@@ -331,10 +330,6 @@ void Init(const SchedulerConfig sconfig)
     {
         TaskConfig *task = (sconfig.tasks + i);
 
-
-        if (task->offset_ms<0) {
-            task->offset_ms = 0;
-        }
 
         //if the deadline is not specified(negative values or 0), the deadline is set to the same value of the period
         if (task->deadline <= 0)

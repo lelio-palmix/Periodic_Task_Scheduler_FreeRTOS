@@ -104,7 +104,7 @@ typedef struct
 /* Global variables for logging and task state management */
 extern volatile QueueHandle_t logQueue;
 extern volatile SemaphoreHandle_t xSemaphore;
-extern volatile TaskState taskState[MAX_TASKS];
+extern TaskState taskState[MAX_TASKS];
 
 /*
  * Function to initialize the PTL scheduler with the given configuration.
@@ -132,8 +132,8 @@ BaseType_t PTL_IsOverrun(TickType_t xLastWakeUpTime, TickType_t xPeriod, TickTyp
  * - xNow: The current tick count.
  * Returns the number of releases that were skipped due to the overrun.
  */
-UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow);
-UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow, TaskConfig *taskConfig,int taskId);
+UBaseType_t PTL_ApplySkipPolicy();
+UBaseType_t PTL_ApplyKillPolicy(volatile TaskConfig *taskConfig,int taskId);
 
 void Task_Function_critical_section(void *params);
 void Task_Function(void *params);

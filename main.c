@@ -8,12 +8,10 @@ void TaskTest_wrap(void *params)
 {
     char *taskName = (char *)params;
     if (taskName == NULL) return;
-    
     if (taskName[4] == 'A') {
-        delay_routine(40);
-    } 
-    else {
-        delay_routine(10);
+        vTaskDelay(pdMS_TO_TICKS(40));
+    } else {
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 

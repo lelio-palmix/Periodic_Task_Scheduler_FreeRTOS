@@ -8,8 +8,8 @@ void TaskTest_wrap(void *params)
 {
     char *taskName = (char *)params;
     if (taskName == NULL) return;
-    if (taskName[4] == 'A') {
-        vTaskDelay(pdMS_TO_TICKS(40));
+    if (taskName[4] == 'A' || taskName[4] == 'B') {
+        vTaskDelay(pdMS_TO_TICKS(40));   
     } else {
         vTaskDelay(pdMS_TO_TICKS(5));
     }
@@ -39,9 +39,9 @@ int main(void)
         .params = (void* )"TaskB", 
         .stackDepth = DEFAULT_STACK_SIZE,
         .uxPriority = 2,
-        .period_ms = 50,
-        .deadline = 50, // Implicit D=T
-        .offset_ms = 0
+        .period_ms = 30,
+        .deadline = 5, 
+        .offset_ms = 15
     };
     
     TaskConfig task3 = {
@@ -51,8 +51,8 @@ int main(void)
         .params = (void* )"TaskC", 
         .stackDepth = DEFAULT_STACK_SIZE,
         .uxPriority = 2,
-        .period_ms = 60,
-        .deadline = 30,
+        .period_ms = 100,
+        .deadline = 100,
         .offset_ms = 0
     };
 

@@ -256,7 +256,8 @@ void Init(const SchedulerConfig sconfig)
             ;
     }
 
-    overrunQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int));
+    /* Overrun queue of length MAX_TASKS because each task can have at most one overrun at a time */
+    overrunQueue = xQueueCreate(MAX_TASKS, sizeof(int));
     if (overrunQueue == NULL)
     {
         UART_printf("[ERROR] Failed to create overrun queue.\n");

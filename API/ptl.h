@@ -52,7 +52,6 @@ typedef struct
     TickType_t timestamp;   /* Tick at which the event occurred */
     int taskId;             /* Index of the task in taskState[] to which the event relates */
     LogEventType eventType; /* Type of the event (START, END, DEADLINE_MISS, etc.) */
-    TickType_t extraData;   /* Additional data for certain events (e.g., deadline time for a miss) */
 } LogEvent;
 
 /* Task configuration structure */
@@ -84,8 +83,6 @@ typedef struct
     TickType_t period;                  /* Period T, in ticks */
     TickType_t deadline;                /* Relative deadline D, in ticks */
     uint32_t k;                         /* Index of the current job (release counter) */
-    BaseType_t overrunNotified;         /* pdTRUE if the current overrun has already
-                                           been signalled, to avoid duplicate notifications */
     uint32_t lastKDeadlineMiss;         /* Job index for which a deadline miss was
                                            last logged, to avoid duplicate miss logs */
 } TaskState;

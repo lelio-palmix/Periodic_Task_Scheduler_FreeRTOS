@@ -10,7 +10,7 @@ inline UBaseType_t PTL_ApplySkipPolicy(volatile TickType_t *xLastWakeUpTime, Tic
 {
     UBaseType_t skippedReleases = 0U;
 
-    // Update xLastWakeUpTime to the next valid release time after xNow, counting how many releases were skipped
+    // While loop to check multiple skipped releases (if necessary)
     while (*xLastWakeUpTime + xPeriod <= xNow)
     {
         *xLastWakeUpTime += xPeriod;
@@ -41,7 +41,7 @@ inline UBaseType_t PTL_ApplyKillPolicy(volatile TaskConfig *taskConfig, int task
     return 1U;
 }
 
-/* ISR for tick-level precision checking of period overruns. */
+/* ISR for tick-level precision checking of deadline misses and overruns. */
 void vApplicationTickHook(void)
 {
 
@@ -96,20 +96,17 @@ void Interrupt_task(void *params)
             ev.timestamp = currentTick;
             ev.taskId = id;
             ev.extraData = 0;
+
             /* Perform the correct policy */
+            int shouldLog = 1;
             switch (taskState[id].policy)
             {
             case POLICY_SKIP:
-                ev.eventType = LOG_OVERRUN_SKIP;
-                /* Critical section to update task state */
-                taskENTER_CRITICAL();
-                PTL_ApplySkipPolicy(&taskState[id].xLastWakeUpTime,
-                                    taskState[id].period, currentTick);
-                taskEXIT_CRITICAL();
+                /* SKIP is handled and logged by Task_Function at the end of the job */
+                shouldLog = 0;
                 break;
             case POLICY_CATCH_UP:
                 ev.eventType = LOG_OVERRUN_CATCHUP;
-                /* Do nothing */
                 break;
             case POLICY_KILL:
                 ev.eventType = LOG_OVERRUN_KILL;
@@ -119,7 +116,8 @@ void Interrupt_task(void *params)
                 break;
             }
 
-            xQueueSend(logQueue, &ev, (TickType_t)0);
+            if (shouldLog)
+                xQueueSend(logQueue, &ev, (TickType_t)0);
         }
     }
 }
@@ -143,32 +141,28 @@ void Task_Function(void *params)
 
     while (1)
     {
-        taskENTER_CRITICAL();
         taskState[idTask].state = TASK_RUNNING;
         taskState[idTask].startTime = xTaskGetTickCount();
         ev.timestamp = taskState[idTask].startTime;
         ev.taskId = idTask;
         ev.eventType = LOG_START;
         ev.extraData = 0;
-        taskEXIT_CRITICAL();
         xQueueSend(logQueue, &ev, (TickType_t)0);
 
         functionBody(taskConfig.params);
 
         xLastJobCompleted = xTaskGetTickCount();
 
-        taskENTER_CRITICAL();
         taskState[idTask].finishTime = xLastJobCompleted;
         taskState[idTask].state = TASK_NOT_RUNNING;
         ev.timestamp = xLastJobCompleted;
         ev.taskId = idTask;
         ev.eventType = LOG_END;
         ev.extraData = 0;
-        taskEXIT_CRITICAL();
         xQueueSend(logQueue, &ev, (TickType_t)0);
 
-        // Deadline miss check
-        if (xLastJobCompleted > taskState[idTask].xLastWakeUpTime + xDeadline && taskState[idTask].lastKDeadlineMiss != taskState[idTask].k) // Condition to avoid multiple logging of the same deadline miss
+        // Condition to avoid multiple logging of the same deadline miss
+        if (xLastJobCompleted > taskState[idTask].xLastWakeUpTime + xDeadline && taskState[idTask].lastKDeadlineMiss != taskState[idTask].k)
         {
             taskState[idTask].lastKDeadlineMiss = taskState[idTask].k; // Update last missed deadline index
             ev.eventType = LOG_DEADLINE_MISS;
@@ -178,9 +172,24 @@ void Task_Function(void *params)
 
         // Prepare for the next period
         TickType_t xLocalWakeTime;
+        UBaseType_t skipped = 0;
+
         taskENTER_CRITICAL();
         xLocalWakeTime = taskState[idTask].xLastWakeUpTime;
+        if (taskState[idTask].policy == POLICY_SKIP)
+            skipped = PTL_ApplySkipPolicy(&xLocalWakeTime, xPeriod, xLastJobCompleted);
         taskEXIT_CRITICAL();
+
+        /* Logging outside the critical section */
+        if (skipped > 0)
+        {
+            LogEvent skipEv;
+            skipEv.timestamp = xLastJobCompleted;
+            skipEv.taskId = idTask;
+            skipEv.eventType = LOG_OVERRUN_SKIP;
+            skipEv.extraData = skipped;
+            xQueueSend(logQueue, &skipEv, (TickType_t)0);
+        }
 
         // xTaskDelayUntil here to ensure that the task wakes up at the correct time, even if there was an overrun
         xTaskDelayUntil(&xLocalWakeTime, xPeriod);
@@ -218,7 +227,8 @@ void LoggingTask(void *params)
                 snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s DEADLINE_MISS\n", (unsigned long)ev.timestamp, name);
                 break;
             case LOG_OVERRUN_SKIP:
-                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> SKIP\n", (unsigned long)ev.timestamp, name);
+                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> SKIP (%lu skipped)\n",
+                         (unsigned long)ev.timestamp, name, (unsigned long)ev.extraData);
                 break;
             case LOG_OVERRUN_CATCHUP:
                 snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP\n", (unsigned long)ev.timestamp, name);

@@ -2,10 +2,22 @@
 #include "delay.h"
 #include "task.h"
 
-// This function simulates a busy-waiting loop for a specified duration in milliseconds
-void delay_routine(unsigned int milliseconds) 
+/*
+ * Busy-wait for `wcetTicks` ticks.
+ */
+void busy_wait_wcet(TickType_t wcetTicks)
 {
-    volatile unsigned long counter = milliseconds * (configCPU_CLOCK_HZ/1000); // compute number of cycles based on CPU clock
-    while (counter--) __asm volatile("nop");
+    TickType_t xLastTickCount = xTaskGetTickCount();
+    TickType_t xExecutedTicks = 0;
+    TickType_t xCurrentTickCount;
+    
+    while (xExecutedTicks < wcetTicks)
+    {
 
+        xCurrentTickCount = xTaskGetTickCount(); 
+        if(xLastTickCount != xCurrentTickCount){
+            xExecutedTicks++;
+            xLastTickCount = xCurrentTickCount;
+        }
+    }
 }

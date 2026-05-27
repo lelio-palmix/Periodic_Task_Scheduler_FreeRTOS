@@ -8,10 +8,11 @@ void TaskTest_wrap(void *params)
 {
     char *taskName = (char *)params;
     if (taskName == NULL) return;
+
     if (taskName[4] == 'A' || taskName[4] == 'B') {
-        vTaskDelay(pdMS_TO_TICKS(40));   
+        busy_wait_wcet(40);   // WCET = 40
     } else {
-        vTaskDelay(pdMS_TO_TICKS(5));
+        busy_wait_wcet(5);
     }
 }
 
@@ -63,7 +64,7 @@ int main(void)
 
     /* Scheduler configuration */
     SchedulerConfig sconfig = {
-         .policy = POLICY_KILL,
+         .policy = POLICY_SKIP,
          .trace_enabled = 1,
          .max_tasks = MAX_TASKS,
          .tasks = tasks,

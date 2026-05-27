@@ -10,7 +10,7 @@ inline UBaseType_t PTL_ApplySkipPolicy(volatile TickType_t *xLastWakeUpTime, Tic
 {
     UBaseType_t skippedReleases = 0U;
 
-    // While loop to check multiple skipped releases (if necessary)
+    /* While loop to check multiple skipped releases (in case) and update the next wake-up time */
     while (*xLastWakeUpTime + xPeriod <= xNow)
     {
         *xLastWakeUpTime += xPeriod;
@@ -57,11 +57,9 @@ void vApplicationTickHook(void)
 
             const TickType_t deadline = taskState[i].xLastWakeUpTime + taskState[i].deadline;
 
-            // Check for deadline miss and log it if it hasn't been logged yet for the current job
             if (taskState[i].lastKDeadlineMiss != taskState[i].k && taskState[i].state == TASK_RUNNING && deadline <= currentTick)
             {
                 taskState[i].lastKDeadlineMiss = taskState[i].k;
-                /* Deferred logging DEADLINE_MISS */
                 LogEvent ev;
                 ev.timestamp = currentTick;
                 ev.taskId = i;
@@ -88,6 +86,7 @@ void Interrupt_task(void *params)
     while (1)
     {
 
+        /* Wait for overrun notifications from ISR and apply the corresponding policy */
         int id;
         if (xQueueReceive(overrunQueue, &id, portMAX_DELAY) == pdTRUE)
         {
@@ -136,6 +135,7 @@ void Task_Function(void *params)
 
     void (*functionBody)(void *) = taskConfig.taskBody;
 
+    /* Delay the task if an offset is specified */
     if (xOffset > 0)
         vTaskDelay(xOffset);
 
@@ -161,19 +161,11 @@ void Task_Function(void *params)
         ev.extraData = 0;
         xQueueSend(logQueue, &ev, (TickType_t)0);
 
-        // Condition to avoid multiple logging of the same deadline miss
-        if (xLastJobCompleted > taskState[idTask].xLastWakeUpTime + xDeadline && taskState[idTask].lastKDeadlineMiss != taskState[idTask].k)
-        {
-            taskState[idTask].lastKDeadlineMiss = taskState[idTask].k; // Update last missed deadline index
-            ev.eventType = LOG_DEADLINE_MISS;
-            ev.extraData = taskState[idTask].xLastWakeUpTime + xDeadline;
-            xQueueSend(logQueue, &ev, (TickType_t)0);
-        }
-
-        // Prepare for the next period
+        /* Prepare for the next period */
         TickType_t xLocalWakeTime;
         UBaseType_t skipped = 0;
 
+        /* Apply SKIP policy */
         taskENTER_CRITICAL();
         xLocalWakeTime = taskState[idTask].xLastWakeUpTime;
         if (taskState[idTask].policy == POLICY_SKIP)
@@ -191,13 +183,14 @@ void Task_Function(void *params)
             xQueueSend(logQueue, &skipEv, (TickType_t)0);
         }
 
-        // xTaskDelayUntil here to ensure that the task wakes up at the correct time, even if there was an overrun
+        /* Wait until the next release time */
         xTaskDelayUntil(&xLocalWakeTime, xPeriod);
 
+        /* Update task state for the next period */
         taskENTER_CRITICAL();
         taskState[idTask].xLastWakeUpTime = xLocalWakeTime;
-        taskState[idTask].k++;                       // Increment k for the next job
-        taskState[idTask].overrunNotified = pdFALSE; // Reset overrun notification for the next job
+        taskState[idTask].k++;
+        taskState[idTask].overrunNotified = pdFALSE;
         taskEXIT_CRITICAL();
     }
 }
@@ -247,8 +240,6 @@ void LoggingTask(void *params)
 
 void Init(const SchedulerConfig sconfig)
 {
-    int globalPolicy = sconfig.policy;
-
     /* Check if the number of tasks exceeds the maximum */
     if (sconfig.num_tasks > sconfig.max_tasks)
     {
@@ -280,7 +271,7 @@ void Init(const SchedulerConfig sconfig)
     {
         TaskConfig *task = (sconfig.tasks + i);
 
-        // if the deadline is not specified(negative values or 0), the deadline is set to the same value of the period
+        /* If the deadline is not specified (negative values or 0), the deadline is set to the same value of the period */
         if (task->deadline <= 0)
         {
             task->deadline = task->period_ms;
@@ -289,7 +280,7 @@ void Init(const SchedulerConfig sconfig)
         task->idTask = i;
 
         snprintf((char *)taskState[i].name, sizeof(taskState[i].name), "%s", task->name);
-        taskState[i].policy = globalPolicy;
+        taskState[i].policy = sconfig.policy;
         taskState[i].state = TASK_NOT_RUNNING;
         taskState[i].k = 0;
         taskState[i].period = pdMS_TO_TICKS(task->period_ms);

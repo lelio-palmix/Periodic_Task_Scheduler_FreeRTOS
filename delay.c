@@ -5,7 +5,7 @@
 /*
  * Busy-wait for `wcetTicks` ticks.
  */
-void busy_wait_wcet(TickType_t wcetTicks)
+void delay_routine(TickType_t wcetTicks)
 {
     TickType_t xLastTickCount = xTaskGetTickCount();
     TickType_t xExecutedTicks = 0;

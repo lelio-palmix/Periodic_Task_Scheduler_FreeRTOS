@@ -10,9 +10,9 @@ void TaskTest_wrap(void *params)
     if (taskName == NULL) return;
 
     if (taskName[4] == 'A' || taskName[4] == 'B') {
-        busy_wait_wcet(40);   // WCET = 40
+        delay_routine(80);
     } else {
-        busy_wait_wcet(5);
+        delay_routine(5);
     }
 }
 

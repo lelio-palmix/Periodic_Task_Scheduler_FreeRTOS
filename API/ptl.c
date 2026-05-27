@@ -251,7 +251,7 @@ void Init(const SchedulerConfig sconfig)
     }
 
     /* Create logging task */
-    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 3, NULL);
+    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 1, NULL);
 
     /* Create interrupt task */
     xTaskCreate(Interrupt_task, "InterruptTask", DEFAULT_STACK_SIZE, NULL, 4, NULL);

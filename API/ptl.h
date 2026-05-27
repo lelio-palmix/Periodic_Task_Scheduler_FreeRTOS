@@ -15,7 +15,7 @@
 #include "queue.h"
 
 /* Configuration constants */
-#define QUEUE_LENGTH 15
+#define QUEUE_LENGTH 50
 #define MESSAGE_LENGTH 60
 #define DEFAULT_STACK_SIZE 512
 #define MAX_TASKS 8

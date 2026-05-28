@@ -15,10 +15,16 @@
 #include "queue.h"
 
 /* Configuration constants */
-#define QUEUE_LENGTH 50
+
+#define QUEUE_LENGTH 30
 #define MESSAGE_LENGTH 60
 #define DEFAULT_STACK_SIZE 512
 #define MAX_TASKS 8
+
+
+// 0 = just log and change last wake-up time(pretty much like skip)
+// 1 = kill the current job and release the new one and log the previous job as missed(pretty much like kill with different log)
+#define CATCH_UP_VERSION 0
 
 /* Task running state: whether a job is currently executing or not. */
 typedef enum
@@ -52,6 +58,7 @@ typedef struct
     TickType_t timestamp;   /* Tick at which the event occurred */
     int taskId;             /* Index of the task in taskState[] to which the event relates */
     LogEventType eventType; /* Type of the event (START, END, DEADLINE_MISS, etc.) */
+    int missed_job;    /* Missed job to log when CATCH-UP policy is enabled */
 } LogEvent;
 
 /* Task configuration structure */

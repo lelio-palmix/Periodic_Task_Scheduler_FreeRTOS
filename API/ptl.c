@@ -21,7 +21,7 @@ inline UBaseType_t PTL_ApplyKillPolicy(volatile TaskConfig *taskConfig, int task
                 taskConfig->stackDepth,
                 taskConfig,
                 taskConfig->uxPriority,
-                (TaskHandle_t *)&taskState[taskId].task);
+                &taskState[taskId].task);
     return 1U;
 }
 
@@ -38,7 +38,6 @@ void vApplicationTickHook(void)
         const TickType_t period = taskState[i].period;
         if (taskState[i].task != NULL)
         {
-
             const TickType_t deadline = taskState[i].xLastWakeUpTime + taskState[i].deadline;
 
             if (taskState[i].lastKDeadlineMiss != taskState[i].k && taskState[i].state == TASK_RUNNING && deadline <= currentTick)
@@ -48,6 +47,7 @@ void vApplicationTickHook(void)
                 ev.timestamp = currentTick;
                 ev.taskId = i;
                 ev.eventType = LOG_DEADLINE_MISS;
+                ev.missed_job = 0;
                 xQueueSendFromISR(logQueue, &ev, 0);
             }
 
@@ -84,12 +84,18 @@ void Interrupt_task(void *params)
             {
             case POLICY_SKIP:
                 ev.eventType = LOG_OVERRUN_SKIP;
+                ev.missed_job = 0;
                 break;
             case POLICY_CATCH_UP:
                 ev.eventType = LOG_OVERRUN_CATCHUP;
+                ev.missed_job = taskState[id].k;
+                #if(CATCH_UP_VERSION == 1)
+                    PTL_ApplyKillPolicy(&taskState[id].taskConfig, id);
+                #endif
                 break;
             case POLICY_KILL:
                 ev.eventType = LOG_OVERRUN_KILL;
+                ev.missed_job = 0;
                 PTL_ApplyKillPolicy(&taskState[id].taskConfig, id);
                 break;
             default:
@@ -125,23 +131,26 @@ void Task_Function(void *params)
         ev.timestamp = taskState[idTask].startTime;
         ev.taskId = idTask;
         ev.eventType = LOG_START;
+        ev.missed_job = 0;
         xQueueSend(logQueue, &ev, (TickType_t)0);
 
         functionBody(taskConfig.params);
 
         xLastJobCompleted = xTaskGetTickCount();
 
-        taskState[idTask].finishTime = xLastJobCompleted;
-        taskState[idTask].state = TASK_NOT_RUNNING;
-        ev.timestamp = xLastJobCompleted;
-        ev.taskId = idTask;
-        ev.eventType = LOG_END;
-        xQueueSend(logQueue, &ev, (TickType_t)0);
+
 
         /* Update task state for the next period */
         taskENTER_CRITICAL();
         taskState[idTask].k++;
+        taskState[idTask].state = TASK_NOT_RUNNING;
+        taskState[idTask].finishTime = xLastJobCompleted;
         taskEXIT_CRITICAL();
+        ev.timestamp = xLastJobCompleted;
+        ev.taskId = idTask;
+        ev.eventType = LOG_END;
+        ev.missed_job = 0;
+        xQueueSend(logQueue, &ev, (TickType_t)0);
 
         /* Wait until the next release time */
         xTaskDelayUntil(&taskState[idTask].xLastWakeUpTime, xPeriod);
@@ -177,7 +186,12 @@ void LoggingTask(void *params)
                          (unsigned long)ev.timestamp, name);
                 break;
             case LOG_OVERRUN_CATCHUP:
-                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP\n", (unsigned long)ev.timestamp, name);
+                #if(CATCH_UP_VERSION==1)
+                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP job=%d\n", (unsigned long)ev.timestamp, name,ev.missed_job);
+                #else
+                    snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP\n", (unsigned long)ev.timestamp, name);
+                #endif
+
                 break;
             case LOG_OVERRUN_KILL:
                 snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> KILL\n", (unsigned long)ev.timestamp, name);
@@ -247,11 +261,11 @@ void Init(const SchedulerConfig sconfig)
                     task->stackDepth,
                     task,
                     task->uxPriority,
-                    (TaskHandle_t *)&taskState[i].task);
+                    &taskState[i].task);
     }
 
     /* Create logging task */
-    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 3, NULL);
+    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 2, NULL);
 
     /* Create interrupt task */
     xTaskCreate(Interrupt_task, "InterruptTask", DEFAULT_STACK_SIZE, NULL, 4, NULL);

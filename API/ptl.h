@@ -20,6 +20,7 @@
 #define MESSAGE_LENGTH 60
 #define DEFAULT_STACK_SIZE 512
 #define MAX_TASKS 8
+#define BASE_PRIORITY 2
 
 
 // 0 = just log and change last wake-up time(pretty much like skip)
@@ -90,7 +91,7 @@ typedef struct
     TickType_t period;                  /* Period T, in ticks */
     TickType_t deadline;                /* Relative deadline D, in ticks */
     uint32_t k;                         /* Index of the current job (release counter) */
-    uint32_t lastKDeadlineMiss;         /* Job index for which a deadline miss was
+    short lastKDeadlineMiss;         /* Job index for which a deadline miss was
                                            last logged, to avoid duplicate miss logs */
 } TaskState;
 

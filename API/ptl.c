@@ -40,9 +40,9 @@ void vApplicationTickHook(void)
         {
             const TickType_t deadline = taskState[i].xLastWakeUpTime + taskState[i].deadline;
 
-            if (taskState[i].lastKDeadlineMiss != taskState[i].k && taskState[i].state == TASK_RUNNING && deadline <= currentTick)
+            if (!taskState[i].lastKDeadlineMiss && taskState[i].state == TASK_RUNNING && deadline <= currentTick)
             {
-                taskState[i].lastKDeadlineMiss = taskState[i].k;
+                taskState[i].lastKDeadlineMiss = 1;
                 LogEvent ev;
                 ev.timestamp = currentTick;
                 ev.taskId = i;
@@ -78,7 +78,7 @@ void Interrupt_task(void *params)
             ev.taskId = id;
 
             taskState[id].xLastWakeUpTime += taskState[id].period;
-
+            taskState[id].lastKDeadlineMiss = 0;
             /* Perform the correct policy */
             switch (taskState[id].policy)
             {
@@ -254,7 +254,7 @@ void Init(const SchedulerConfig sconfig)
         taskState[i].deadline = pdMS_TO_TICKS(task->deadline);
         taskState[i].xLastWakeUpTime = pdMS_TO_TICKS(task->offset_ms);
         taskState[i].taskConfig = *task;
-        taskState[i].lastKDeadlineMiss = -1;
+        taskState[i].lastKDeadlineMiss = 0;
 
         xTaskCreate(Task_Function,
                     task->name,

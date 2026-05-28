@@ -15,15 +15,14 @@
 #include "queue.h"
 
 /* Configuration constants */
-
 #define QUEUE_LENGTH 30
 #define MESSAGE_LENGTH 60
 #define DEFAULT_STACK_SIZE 512
 #define MAX_TASKS 8
 
 
-// 0 = just log and change last wake-up time(pretty much like skip)
-// 1 = kill the current job and release the new one and log the previous job as missed(pretty much like kill with different log)
+/* 0 = Just log and change xLastWakeUpTime (pretty much like SKIP)
+** 1 = Kill the current job and release the new one, then log the previous job as missed (similar to KILL with different log) */
 #define CATCH_UP_VERSION 0
 
 /* Task running state: whether a job is currently executing or not. */
@@ -120,16 +119,6 @@ extern TaskState taskState[MAX_TASKS];      /* Per-task runtime state */
  * return under normal operation.
  */
 void Init(const SchedulerConfig sconfig);
-
-/*
- * Apply the SKIP policy when an overrun is detected.
- * Parameters:
- * - xLastWakeUpTime: Pointer to the last wake-up time of the task, which will be updated.
- * - xPeriod: The period of the task in ticks.
- * - xNow: The current tick count.
- * Returns the number of releases that were skipped due to the overrun.
- */
-UBaseType_t PTL_ApplySkipPolicy(volatile TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow);
 
 /*
  * Apply the KILL policy when an overrun is detected.

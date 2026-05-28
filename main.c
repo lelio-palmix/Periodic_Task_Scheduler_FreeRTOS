@@ -10,9 +10,9 @@ void TaskTest_wrap(void *params)
     if (taskName == NULL) return;
 
     if (taskName[4] == 'A' || taskName[4] == 'B') {
-        delay_routine(80);
+        delay_routine(pdMS_TO_TICKS(80));
     } else {
-        delay_routine(5);
+        delay_routine(pdMS_TO_TICKS(5));
     }
 }
 

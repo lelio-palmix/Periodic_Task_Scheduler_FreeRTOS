@@ -13,7 +13,6 @@ inline UBaseType_t PTL_ApplyKillPolicy(volatile TaskConfig *taskConfig, int task
 
     vTaskDelete(task);
 
-    taskState[taskId].xLastWakeUpTime += taskState[taskId].period;
     taskState[taskId].state = TASK_NOT_RUNNING;
     taskState[taskId].k++;
 
@@ -78,12 +77,13 @@ void Interrupt_task(void *params)
             ev.timestamp = currentTick;
             ev.taskId = id;
 
+            taskState[id].xLastWakeUpTime += taskState[id].period;
+
             /* Perform the correct policy */
             switch (taskState[id].policy)
             {
             case POLICY_SKIP:
                 ev.eventType = LOG_OVERRUN_SKIP;
-                taskState[id].xLastWakeUpTime += taskState[id].period;
                 break;
             case POLICY_CATCH_UP:
                 ev.eventType = LOG_OVERRUN_CATCHUP;
@@ -251,7 +251,7 @@ void Init(const SchedulerConfig sconfig)
     }
 
     /* Create logging task */
-    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 3, NULL);
 
     /* Create interrupt task */
     xTaskCreate(Interrupt_task, "InterruptTask", DEFAULT_STACK_SIZE, NULL, 4, NULL);

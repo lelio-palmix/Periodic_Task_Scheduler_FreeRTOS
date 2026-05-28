@@ -187,7 +187,7 @@ void LoggingTask(void *params)
                 break;
             case LOG_OVERRUN_CATCHUP:
                 #if(CATCH_UP_VERSION==1)
-                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP job=%d\n", (unsigned long)ev.timestamp, name,ev.missed_job);
+                    snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP job=%lu\n", (unsigned long)ev.timestamp, name,(unsigned long)ev.missed_job);
                 #else
                     snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP\n", (unsigned long)ev.timestamp, name);
                 #endif

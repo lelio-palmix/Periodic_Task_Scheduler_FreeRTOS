@@ -58,7 +58,7 @@ typedef struct
     TickType_t timestamp;   /* Tick at which the event occurred */
     int taskId;             /* Index of the task in taskState[] to which the event relates */
     LogEventType eventType; /* Type of the event (START, END, DEADLINE_MISS, etc.) */
-    int missed_job;    /* Missed job to log when CATCH-UP policy is enabled */
+    uint32_t missed_job;    /* Missed job to log when CATCH-UP policy is enabled */
 } LogEvent;
 
 /* Task configuration structure */

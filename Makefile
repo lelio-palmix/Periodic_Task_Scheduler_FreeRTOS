@@ -71,6 +71,9 @@ CFLAGS += -ffunction-sections
 # Place each variable in a dedicated section (see -gc-sections in LDFLAGS)
 CFLAGS += -fdata-sections
 
+# Allow passing extra flag for automated testing
+CFLAGS += $(EXTRA_CFLAGS)
+
 # Specify the linker script
 LDFLAGS = -T ./mps2_m3.ld
 

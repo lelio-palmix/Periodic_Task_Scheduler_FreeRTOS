@@ -3,130 +3,113 @@
 #include <stdio.h>
 
 volatile QueueHandle_t logQueue;
-volatile SemaphoreHandle_t xSemaphore;
-volatile TaskState taskState[MAX_TASKS];
-volatile TaskHandle_t interruptTaskHandler;
+volatile QueueHandle_t overrunQueue;
+TaskState taskState[MAX_TASKS];
 
-
-BaseType_t PTL_IsOverrun(TickType_t xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow)
+inline UBaseType_t PTL_ApplyKillPolicy(volatile TaskConfig *taskConfig, int taskId)
 {
-    TickType_t xNextRelease = xLastWakeUpTime + xPeriod;
-    return (xNextRelease <= xNow) ? pdTRUE : pdFALSE; // change < with <=
-}
-
-UBaseType_t PTL_ApplySkipPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow)
-{
-    UBaseType_t skippedReleases = 0U;
-
-    while (PTL_IsOverrun(*xLastWakeUpTime, xPeriod, xNow) == pdTRUE)
-    {
-        *xLastWakeUpTime += xPeriod;
-        skippedReleases++;
-    }
-
-    return skippedReleases;
-}
-
-UBaseType_t PTL_ApplyKillPolicy(TickType_t *xLastWakeUpTime, TickType_t xPeriod, TickType_t xNow, TaskConfig *taskConfig, int taskId)
-{
+    taskConfig->offset_ms = 0;
     TaskHandle_t task = taskState[taskId].task;
 
-    if (PTL_IsOverrun(*xLastWakeUpTime, xPeriod, xNow) == pdTRUE)
-    {
-        vTaskDelete(task);
-        *xLastWakeUpTime = xNow;
-        xTaskCreate(Task_Function, taskConfig->name, taskConfig->stackDepth, taskConfig, taskConfig->uxPriority,(TaskHandle_t *) &taskState[taskId].task);
+    vTaskDelete(task);
 
-    }
+    taskState[taskId].state = TASK_NOT_RUNNING;
+    taskState[taskId].k++;
 
+    xTaskCreate(Task_Function,
+                taskConfig->name,
+                taskConfig->stackDepth,
+                taskConfig,
+                taskConfig->uxPriority,
+                &taskState[taskId].task);
     return 1U;
 }
-/* ISR for tick-level precision checking of period overruns. */
+
+/* ISR for tick-level precision checking of deadline misses and overruns. */
 void vApplicationTickHook(void)
 {
-    
+
     TickType_t currentTick = xTaskGetTickCountFromISR();
-    
-    // LogEvent ev;
+
     BaseType_t contextSwitch = pdFALSE;
 
     for (int i = 0; i < MAX_TASKS; i++)
     {
+        const TickType_t period = taskState[i].period;
         if (taskState[i].task != NULL)
         {
-            TickType_t nextRelease = taskState[i].lastReleaseTime + pdMS_TO_TICKS(taskState[i].period_ms);
-            //It is possible to change with PTL_IsOverrun() function?
-            if ((currentTick >= nextRelease) && (currentTick > 0)) 
-            {
-                taskState[i].lastReleaseTime = nextRelease;
+            const TickType_t deadline = taskState[i].xLastWakeUpTime + taskState[i].deadline;
 
-                /* Log overrun event based on the task's policy */
-                if (taskState[i].state == TASK_RUNNING)
-                {
-                    /*
-                            This function notify from the isr to the task that it should be wake up and
-                            send to the task one value that it can be overwrite (eSetValueWithOverwrite)
-                    */
-                    xTaskNotifyFromISR(interruptTaskHandler, i, eSetValueWithOverwrite, &contextSwitch);
-                }
+            if (!taskState[i].lastKDeadlineMiss && taskState[i].state == TASK_RUNNING && deadline <= currentTick)
+            {
+                taskState[i].lastKDeadlineMiss = 1;
+                LogEvent ev;
+                ev.timestamp = currentTick;
+                ev.taskId = i;
+                ev.eventType = LOG_DEADLINE_MISS;
+                ev.missed_job = 0;
+                xQueueSendFromISR(logQueue, &ev, 0);
+            }
+
+            const TickType_t nextRelease = taskState[i].xLastWakeUpTime + period;
+            if (nextRelease <= currentTick && taskState[i].state == TASK_RUNNING)
+            {
+                int taskId = i;
+                xQueueSendFromISR(overrunQueue, &taskId, &contextSwitch);
             }
         }
     }
-    //Force context switch
-    portYIELD_FROM_ISR(contextSwitch);
 }
 
-void Interrupt_task(void *params){
+void Interrupt_task(void *params)
+{
     (void)params;
 
-    while(1){
-        
-        uint32_t ulReceivedValue;
-        if( xTaskNotifyWait( 
-                0x00,             
-                0xFFFFFFFF,       
-                &ulReceivedValue, 
-                portMAX_DELAY     
-            ) == pdTRUE )
+    while (1)
+    {
+
+        /* Wait for overrun notifications from ISR and apply the corresponding policy */
+        int id;
+        if (xQueueReceive(overrunQueue, &id, portMAX_DELAY) == pdTRUE)
         {
-            int id = (int)ulReceivedValue;
             LogEvent ev;
             TickType_t currentTick = xTaskGetTickCount();
-            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
             ev.timestamp = currentTick;
             ev.taskId = id;
-            ev.extraData = 0;
+
+            taskState[id].xLastWakeUpTime += taskState[id].period;
+            taskState[id].lastKDeadlineMiss = 0;
             /* Perform the correct policy */
             switch (taskState[id].policy)
             {
             case POLICY_SKIP:
                 ev.eventType = LOG_OVERRUN_SKIP;
-                PTL_ApplySkipPolicy(&taskState[id].xLastWakeUpTime,taskState[id].period_ms,currentTick);
+                ev.missed_job = 0;
                 break;
             case POLICY_CATCH_UP:
                 ev.eventType = LOG_OVERRUN_CATCHUP;
-                /* Do nothing */   
+                ev.missed_job = taskState[id].k;
+                #if(CATCH_UP_VERSION == 1)
+                    PTL_ApplyKillPolicy(&taskState[id].taskConfig, id);
+                #endif
                 break;
             case POLICY_KILL:
                 ev.eventType = LOG_OVERRUN_KILL;
-                
-                PTL_ApplyKillPolicy(&taskState[id].xLastWakeUpTime, taskState[id].period_ms, currentTick, &taskState[id].taskConfig,id);                                
-                break;               
-            default: break;    
+                ev.missed_job = 0;
+                PTL_ApplyKillPolicy(&taskState[id].taskConfig, id);
+                break;
+            default:
+                break;
             }
-
             xQueueSend(logQueue, &ev, (TickType_t)0);
         }
     }
-
 }
 
 /* Task function implementation */
 void Task_Function(void *params)
 {
     TaskConfig taskConfig = *((TaskConfig *)params);
-
-    //TickType_t xLastWakeUpTime;
     TickType_t xLastJobCompleted;
     LogEvent ev;
 
@@ -137,132 +120,39 @@ void Task_Function(void *params)
 
     void (*functionBody)(void *) = taskConfig.taskBody;
 
+    /* Delay the task if an offset is specified */
     if (xOffset > 0)
-    {
         vTaskDelay(xOffset);
-    }
-
-    //xLastWakeUpTime = 0;
 
     while (1)
     {
-        //LA nuova task non prende il semaforo
-        if (xSemaphoreTake(xSemaphore, portMAX_DELAY) == pdTRUE)
-        {
-            taskState[idTask].state = TASK_RUNNING;
-            taskState[idTask].startTime = xTaskGetTickCount();
-            xSemaphoreGive(xSemaphore);
-
-            /* Deferred logging START */
-            ev.timestamp = taskState[idTask].startTime;
-            ev.taskId = idTask;
-            ev.eventType = LOG_START;
-            ev.extraData = 0;
-            xQueueSend(logQueue, &ev, (TickType_t)0);
-        }
-
-        functionBody(taskConfig.params);
-
-        xLastJobCompleted = xTaskGetTickCount();
-
-        /* Deferred logging END */
-        ev.timestamp = xLastJobCompleted;
-        ev.taskId = idTask;
-        ev.eventType = LOG_END;
-        ev.extraData = 0;
-        xQueueSend(logQueue, &ev, (TickType_t)0);
-
-        if (xSemaphoreTake(xSemaphore, portMAX_DELAY) == pdTRUE)
-        {
-            taskState[idTask].finishTime = xLastJobCompleted;
-            taskState[idTask].state = TASK_NOT_RUNNING;
-            taskState[idTask].k++;
-            xSemaphoreGive(xSemaphore);
-        }
-
-        if (xLastJobCompleted > taskState[idTask].xLastWakeUpTime + xDeadline)
-        {
-            /* Deferred logging DEADLINE_MISS */
-            ev.timestamp = xLastJobCompleted;
-            ev.taskId = idTask;
-            ev.eventType = LOG_DEADLINE_MISS;
-            ev.extraData = taskState[idTask].xLastWakeUpTime + xDeadline;
-            xQueueSend(logQueue, &ev, (TickType_t)0);
-        }
-        /* Delay task until next release time */
-        xTaskDelayUntil(&taskState[idTask].xLastWakeUpTime, xPeriod);
-    }
-}
-
-/* Task function implementation */
-void Task_Function_critical_section(void *params)
-{
-    TaskConfig taskConfig = *((TaskConfig *)params);
-
-    //TickType_t xLastWakeUpTime;
-    TickType_t xLastJobCompleted;
-    LogEvent ev;
-
-    const int idTask = taskConfig.idTask;
-    const TickType_t xPeriod = pdMS_TO_TICKS(taskConfig.period_ms);
-    const TickType_t xDeadline = pdMS_TO_TICKS(taskConfig.deadline);
-    const TickType_t xOffset = pdMS_TO_TICKS(taskConfig.offset_ms);
-
-    void (*functionBody)(void *) = taskConfig.taskBody;
-
-    if (xOffset > 0)
-    {
-        vTaskDelay(xOffset);
-    }
-
-    //xLastWakeUpTime = 0;
-
-    while (1)
-    {
-        //Modifica per utilizzare la critical section invece del semaforo
-        
-        taskENTER_CRITICAL();
-
         taskState[idTask].state = TASK_RUNNING;
         taskState[idTask].startTime = xTaskGetTickCount();
-
-        /* Deferred logging START */
         ev.timestamp = taskState[idTask].startTime;
         ev.taskId = idTask;
         ev.eventType = LOG_START;
-        ev.extraData = 0;
+        ev.missed_job = 0;
         xQueueSend(logQueue, &ev, (TickType_t)0);
-        taskEXIT_CRITICAL();
-    
 
         functionBody(taskConfig.params);
 
         xLastJobCompleted = xTaskGetTickCount();
 
-        /* Deferred logging END */
+
+
+        /* Update task state for the next period */
         taskENTER_CRITICAL();
+        taskState[idTask].k++;
+        taskState[idTask].state = TASK_NOT_RUNNING;
+        taskState[idTask].finishTime = xLastJobCompleted;
+        taskEXIT_CRITICAL();
         ev.timestamp = xLastJobCompleted;
         ev.taskId = idTask;
         ev.eventType = LOG_END;
-        ev.extraData = 0;
+        ev.missed_job = 0;
         xQueueSend(logQueue, &ev, (TickType_t)0);
-        
-        taskState[idTask].finishTime = xLastJobCompleted;
-        taskState[idTask].state = TASK_NOT_RUNNING;
-        taskState[idTask].k++;
 
-        taskEXIT_CRITICAL();
-
-        if (xLastJobCompleted > taskState[idTask].xLastWakeUpTime + xDeadline)
-        {
-            /* Deferred logging DEADLINE_MISS */
-            ev.timestamp = xLastJobCompleted;
-            ev.taskId = idTask;
-            ev.eventType = LOG_DEADLINE_MISS;
-            ev.extraData = taskState[idTask].xLastWakeUpTime + xDeadline;
-            xQueueSend(logQueue, &ev, (TickType_t)0);
-        }
-        /* Delay task until next release time */
+        /* Wait until the next release time */
         xTaskDelayUntil(&taskState[idTask].xLastWakeUpTime, xPeriod);
     }
 }
@@ -289,13 +179,19 @@ void LoggingTask(void *params)
                 snprintf(buffer, MESSAGE_LENGTH, "[INFO] t=%lu task=%s END\n", (unsigned long)ev.timestamp, name);
                 break;
             case LOG_DEADLINE_MISS:
-                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s DEADLINE_MISS dl=%lu\n", (unsigned long)ev.timestamp, name, (unsigned long)ev.extraData);
+                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s DEADLINE_MISS\n", (unsigned long)ev.timestamp, name);
                 break;
             case LOG_OVERRUN_SKIP:
-                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> SKIP\n", (unsigned long)ev.timestamp, name);
+                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> SKIP\n",
+                         (unsigned long)ev.timestamp, name);
                 break;
             case LOG_OVERRUN_CATCHUP:
-                snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP\n", (unsigned long)ev.timestamp, name);
+                #if(CATCH_UP_VERSION==1)
+                    snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP job=%lu\n", (unsigned long)ev.timestamp, name,(unsigned long)ev.missed_job);
+                #else
+                    snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP\n", (unsigned long)ev.timestamp, name);
+                #endif
+
                 break;
             case LOG_OVERRUN_KILL:
                 snprintf(buffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> KILL\n", (unsigned long)ev.timestamp, name);
@@ -311,8 +207,6 @@ void LoggingTask(void *params)
 
 void Init(const SchedulerConfig sconfig)
 {
-    int globalPolicy = sconfig.policy;
-
     /* Check if the number of tasks exceeds the maximum */
     if (sconfig.num_tasks > sconfig.max_tasks)
     {
@@ -322,12 +216,19 @@ void Init(const SchedulerConfig sconfig)
     }
 
     logQueue = xQueueCreate(QUEUE_LENGTH, sizeof(LogEvent));
-    xSemaphore = xSemaphoreCreateMutex();
 
-    /* Check if semaphore and queue were created successfully */
-    if (xSemaphore == NULL || logQueue == NULL)
+    if (logQueue == NULL)
     {
-        UART_printf("Failed to create RTOS primitives!");
+        UART_printf("[ERROR] Failed to create log queue.\n");
+        while (1)
+            ;
+    }
+
+    /* Overrun queue of length MAX_TASKS because each task can have at most one overrun at a time */
+    overrunQueue = xQueueCreate(MAX_TASKS, sizeof(int));
+    if (overrunQueue == NULL)
+    {
+        UART_printf("[ERROR] Failed to create overrun queue.\n");
         while (1)
             ;
     }
@@ -337,6 +238,7 @@ void Init(const SchedulerConfig sconfig)
     {
         TaskConfig *task = (sconfig.tasks + i);
 
+        /* If the deadline is not specified (negative values or 0), the deadline is set to the same value of the period */
         if (task->deadline <= 0)
         {
             task->deadline = task->period_ms;
@@ -345,22 +247,28 @@ void Init(const SchedulerConfig sconfig)
         task->idTask = i;
 
         snprintf((char *)taskState[i].name, sizeof(taskState[i].name), "%s", task->name);
-        taskState[i].policy = globalPolicy;
+        taskState[i].policy = sconfig.policy;
         taskState[i].state = TASK_NOT_RUNNING;
         taskState[i].k = 0;
-        taskState[i].period_ms = task->period_ms;
-        taskState[i].deadline = task->deadline;
-        taskState[i].lastReleaseTime = 0;
-        taskState[i].xLastWakeUpTime = 0;
+        taskState[i].period = pdMS_TO_TICKS(task->period_ms);
+        taskState[i].deadline = pdMS_TO_TICKS(task->deadline);
+        taskState[i].xLastWakeUpTime = pdMS_TO_TICKS(task->offset_ms);
         taskState[i].taskConfig = *task;
+        taskState[i].lastKDeadlineMiss = 0;
 
-        xTaskCreate(Task_Function, task->name, task->stackDepth, task, task->uxPriority, (TaskHandle_t *)&taskState[i].task);
+        xTaskCreate(Task_Function,
+                    task->name,
+                    task->stackDepth,
+                    task,
+                    task->uxPriority,
+                    &taskState[i].task);
     }
 
     /* Create logging task */
-    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 3, NULL);
-    
-    xTaskCreate(Interrupt_task, "InterruptTask", DEFAULT_STACK_SIZE, NULL, 4, (TaskHandle_t *)&interruptTaskHandler);
+    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 2, NULL);
+
+    /* Create interrupt task */
+    xTaskCreate(Interrupt_task, "InterruptTask", DEFAULT_STACK_SIZE, NULL, 4, NULL);
 
     /* Start the scheduler */
     vTaskStartScheduler();

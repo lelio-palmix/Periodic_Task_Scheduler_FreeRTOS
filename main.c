@@ -8,12 +8,11 @@ void TaskTest_wrap(void *params)
 {
     char *taskName = (char *)params;
     if (taskName == NULL) return;
-    
-    if (taskName[4] == 'A') {
-        delay_routine(40);
-    } 
-    else {
-        delay_routine(10);
+
+    if (taskName[4] == 'A' || taskName[4] == 'B') {
+        delay_routine(pdMS_TO_TICKS(80));
+    } else {
+        delay_routine(pdMS_TO_TICKS(5));
     }
 }
 
@@ -41,9 +40,9 @@ int main(void)
         .params = (void* )"TaskB", 
         .stackDepth = DEFAULT_STACK_SIZE,
         .uxPriority = 2,
-        .period_ms = 50,
-        .deadline = 50, // Implicit D=T
-        .offset_ms = 0
+        .period_ms = 30,
+        .deadline = 5, 
+        .offset_ms = 15
     };
     
     TaskConfig task3 = {
@@ -53,8 +52,8 @@ int main(void)
         .params = (void* )"TaskC", 
         .stackDepth = DEFAULT_STACK_SIZE,
         .uxPriority = 2,
-        .period_ms = 60,
-        .deadline = 30,
+        .period_ms = 100,
+        .deadline = 100,
         .offset_ms = 0
     };
 
@@ -65,7 +64,7 @@ int main(void)
 
     /* Scheduler configuration */
     SchedulerConfig sconfig = {
-         .policy = POLICY_KILL,
+         .policy = POLICY_CATCH_UP,
          .trace_enabled = 1,
          .max_tasks = MAX_TASKS,
          .tasks = tasks,

@@ -23,7 +23,7 @@ def generate_h():
         out.write('void TaskTest_wrap(void *params)\n')
         out.write('{\n')
         out.write('    int duration = *((int *)params);\n')
-        out.write('    delay_routine(duration);\n')
+        out.write('    delay_routine(pdMS_TO_TICKS(duration));\n')
         out.write('}\n\n')
         out.write('static inline void load_test_scenario(int test_id, SchedulerConfig *sconfig, TaskConfig *tasks) {\n')
         out.write('    switch(test_id) {\n')

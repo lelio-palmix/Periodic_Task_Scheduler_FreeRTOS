@@ -2,48 +2,573 @@
   "tests": [
     {
       "id": 1,
-      "name": "Preemption and timing consistency checks",
+      "name": "Single periodic task - baseline (no miss)",
       "policy": "POLICY_SKIP",
       "tasks": [
-        {"name": "TaskA", "id": 0, "workload": 10, "priority": 3, "period": 30, "deadline": 30},
-        {"name": "TaskB", "id": 1, "workload": 25, "priority": 2, "period": 50, "deadline": 50}
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 10,
+          "priority": 3,
+          "period": 50,
+          "deadline": 50,
+          "offset": 0
+        }
       ],
-      "must_have": ["task=TaskA END", "task=TaskB END"],
-      "must_not_have": ["OVERRUN", "DEADLINE_MISS"]
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA END"
+      ],
+      "must_not_have": [
+        "DEADLINE_MISS",
+        "OVERRUN"
+      ]
     },
     {
       "id": 2,
-      "name": "Stress Test (Overlapping HRT) - Policy SKIP",
+      "name": "RM two tasks - high preempts low, schedulable (no miss)",
       "policy": "POLICY_SKIP",
       "tasks": [
-        {"name": "TaskA", "id": 0, "workload": 40, "priority": 3, "period": 30, "deadline": 15},
-        {"name": "TaskB", "id": 1, "workload": 10, "priority": 2, "period": 50, "deadline": 50}
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 10,
+          "priority": 3,
+          "period": 30,
+          "deadline": 30,
+          "offset": 0
+        },
+        {
+          "name": "TaskB",
+          "id": 1,
+          "workload": 20,
+          "priority": 1,
+          "period": 100,
+          "deadline": 100,
+          "offset": 0
+        }
       ],
-      "must_have": ["OVERRUN -> SKIP", "DEADLINE_MISS"],
-      "must_not_have": ["CATCH_UP"]
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA END",
+        "task=TaskB START",
+        "task=TaskB END"
+      ],
+      "must_not_have": [
+        "DEADLINE_MISS",
+        "OVERRUN"
+      ]
     },
     {
       "id": 3,
-      "name": "Stress Test (Overlapping HRT) - Policy CATCH_UP",
-      "policy": "POLICY_CATCH_UP",
+      "name": "Overload single task - SKIP policy",
+      "policy": "POLICY_SKIP",
       "tasks": [
-        {"name": "TaskA", "id": 0, "workload": 40, "priority": 3, "period": 30, "deadline": 15},
-        {"name": "TaskB", "id": 1, "workload": 10, "priority": 2, "period": 50, "deadline": 50}
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 40,
+          "priority": 3,
+          "period": 30,
+          "deadline": 30,
+          "offset": 0
+        }
       ],
-      "must_have": ["OVERRUN -> CATCH_UP", "DEADLINE_MISS"],
-      "must_not_have": ["SKIP"]
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA END",
+        "task=TaskA DEADLINE_MISS",
+        "task=TaskA OVERRUN -> SKIP"
+      ],
+      "must_not_have": [
+        "CATCH_UP",
+        "KILL"
+      ]
     },
     {
       "id": 4,
-      "name": "Edge-case tests (Minimal time gaps)",
+      "name": "Overload single task - CATCH_UP policy",
       "policy": "POLICY_CATCH_UP",
       "tasks": [
-        {"name": "TaskA", "id": 0, "workload": 10, "priority": 3, "period": 15, "deadline": 15},
-        {"name": "TaskB", "id": 1, "workload": 10, "priority": 2, "period": 20, "deadline": 20},
-        {"name": "TaskC", "id": 2, "workload": 10, "priority": 1, "period": 30, "deadline": 30}
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 40,
+          "priority": 3,
+          "period": 30,
+          "deadline": 30,
+          "offset": 0
+        }
       ],
-      "must_have": ["START"],
-      "must_not_have": []
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA END",
+        "task=TaskA DEADLINE_MISS",
+        "task=TaskA OVERRUN -> CATCH_UP"
+      ],
+      "must_not_have": [
+        "SKIP",
+        "KILL"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Overload single task - KILL policy (job never completes)",
+      "policy": "POLICY_KILL",
+      "tasks": [
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 40,
+          "priority": 3,
+          "period": 30,
+          "deadline": 30,
+          "offset": 0
+        }
+      ],
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA DEADLINE_MISS",
+        "task=TaskA OVERRUN -> KILL"
+      ],
+      "must_not_have": [
+        "task=TaskA END",
+        "SKIP",
+        "CATCH_UP"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Offset/phasing - two equal-priority tasks staggered (no miss)",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 10,
+          "priority": 3,
+          "period": 40,
+          "deadline": 40,
+          "offset": 0
+        },
+        {
+          "name": "TaskB",
+          "id": 1,
+          "workload": 10,
+          "priority": 3,
+          "period": 40,
+          "deadline": 40,
+          "offset": 20
+        }
+      ],
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA END",
+        "task=TaskB START",
+        "task=TaskB END"
+      ],
+      "must_not_have": [
+        "DEADLINE_MISS",
+        "OVERRUN",
+        "[INFO] t=1 task=TaskB START"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Constrained deadline D<T - miss without overrun",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 20,
+          "priority": 3,
+          "period": 60,
+          "deadline": 15,
+          "offset": 0
+        }
+      ],
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA END",
+        "task=TaskA DEADLINE_MISS"
+      ],
+      "must_not_have": [
+        "OVERRUN"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Harmonic 3-task set - nested preemption, schedulable (no miss)",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 5,
+          "priority": 3,
+          "period": 20,
+          "deadline": 20,
+          "offset": 0
+        },
+        {
+          "name": "TaskB",
+          "id": 1,
+          "workload": 8,
+          "priority": 2,
+          "period": 40,
+          "deadline": 40,
+          "offset": 0
+        },
+        {
+          "name": "TaskC",
+          "id": 2,
+          "workload": 10,
+          "priority": 1,
+          "period": 100,
+          "deadline": 100,
+          "offset": 0
+        }
+      ],
+      "must_have": [
+        "task=TaskA END",
+        "task=TaskB END",
+        "task=TaskC END"
+      ],
+      "must_not_have": [
+        "DEADLINE_MISS",
+        "OVERRUN"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Max tasks (8) - light load, staggered offsets (no miss)",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {
+          "name": "T0",
+          "id": 0,
+          "workload": 5,
+          "priority": 3,
+          "period": 80,
+          "deadline": 80,
+          "offset": 0
+        },
+        {
+          "name": "T1",
+          "id": 1,
+          "workload": 5,
+          "priority": 3,
+          "period": 80,
+          "deadline": 80,
+          "offset": 10
+        },
+        {
+          "name": "T2",
+          "id": 2,
+          "workload": 5,
+          "priority": 3,
+          "period": 80,
+          "deadline": 80,
+          "offset": 20
+        },
+        {
+          "name": "T3",
+          "id": 3,
+          "workload": 5,
+          "priority": 3,
+          "period": 80,
+          "deadline": 80,
+          "offset": 30
+        },
+        {
+          "name": "T4",
+          "id": 4,
+          "workload": 5,
+          "priority": 3,
+          "period": 80,
+          "deadline": 80,
+          "offset": 40
+        },
+        {
+          "name": "T5",
+          "id": 5,
+          "workload": 5,
+          "priority": 3,
+          "period": 80,
+          "deadline": 80,
+          "offset": 50
+        },
+        {
+          "name": "T6",
+          "id": 6,
+          "workload": 5,
+          "priority": 3,
+          "period": 80,
+          "deadline": 80,
+          "offset": 60
+        },
+        {
+          "name": "T7",
+          "id": 7,
+          "workload": 5,
+          "priority": 3,
+          "period": 80,
+          "deadline": 80,
+          "offset": 70
+        }
+      ],
+      "must_have": [
+        "task=T0 END",
+        "task=T1 END",
+        "task=T2 END",
+        "task=T3 END",
+        "task=T4 END",
+        "task=T5 END",
+        "task=T6 END",
+        "task=T7 END"
+      ],
+      "must_not_have": [
+        "DEADLINE_MISS",
+        "OVERRUN",
+        "[INFO] t=1 task=T7 START"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "RM unschedulable - lowest-priority task absorbs overload",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 10,
+          "priority": 3,
+          "period": 20,
+          "deadline": 20,
+          "offset": 0
+        },
+        {
+          "name": "TaskB",
+          "id": 1,
+          "workload": 10,
+          "priority": 2,
+          "period": 40,
+          "deadline": 40,
+          "offset": 0
+        },
+        {
+          "name": "TaskC",
+          "id": 2,
+          "workload": 10,
+          "priority": 1,
+          "period": 40,
+          "deadline": 40,
+          "offset": 0
+        }
+      ],
+      "must_have": [
+        "task=TaskA END",
+        "task=TaskB END",
+        "task=TaskC DEADLINE_MISS",
+        "task=TaskC OVERRUN -> SKIP"
+      ],
+      "must_not_have": [
+        "task=TaskA DEADLINE_MISS",
+        "task=TaskB DEADLINE_MISS",
+        "CATCH_UP",
+        "KILL"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Offset pipeline - three equal-priority stages (no miss)",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 10,
+          "priority": 3,
+          "period": 60,
+          "deadline": 60,
+          "offset": 0
+        },
+        {
+          "name": "TaskB",
+          "id": 1,
+          "workload": 10,
+          "priority": 3,
+          "period": 60,
+          "deadline": 60,
+          "offset": 15
+        },
+        {
+          "name": "TaskC",
+          "id": 2,
+          "workload": 10,
+          "priority": 3,
+          "period": 60,
+          "deadline": 60,
+          "offset": 30
+        }
+      ],
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA END",
+        "task=TaskB START",
+        "task=TaskB END",
+        "task=TaskC START",
+        "task=TaskC END"
+      ],
+      "must_not_have": [
+        "DEADLINE_MISS",
+        "OVERRUN",
+        "[INFO] t=1 task=TaskB START",
+        "[INFO] t=1 task=TaskC START"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "KILL isolation - overloaded task killed, healthy task unaffected",
+      "policy": "POLICY_KILL",
+      "tasks": [
+        {
+          "name": "Heavy",
+          "id": 0,
+          "workload": 40,
+          "priority": 2,
+          "period": 30,
+          "deadline": 30,
+          "offset": 0
+        },
+        {
+          "name": "Light",
+          "id": 1,
+          "workload": 5,
+          "priority": 3,
+          "period": 50,
+          "deadline": 50,
+          "offset": 0
+        }
+      ],
+      "must_have": [
+        "task=Heavy DEADLINE_MISS",
+        "task=Heavy OVERRUN -> KILL",
+        "task=Light START",
+        "task=Light END"
+      ],
+      "must_not_have": [
+        "task=Light DEADLINE_MISS",
+        "task=Heavy END",
+        "SKIP",
+        "CATCH_UP"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Severe overload - repeated CATCH_UP recovery",
+      "policy": "POLICY_CATCH_UP",
+      "tasks": [
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 70,
+          "priority": 3,
+          "period": 30,
+          "deadline": 30,
+          "offset": 0
+        }
+      ],
+      "must_have": [
+        "task=TaskA START",
+        "task=TaskA END",
+        "task=TaskA DEADLINE_MISS",
+        "task=TaskA OVERRUN -> CATCH_UP"
+      ],
+      "must_not_have": [
+        "SKIP",
+        "KILL"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Isolation - healthy high-prio protected from overloaded low-prio",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {
+          "name": "Safe",
+          "id": 0,
+          "workload": 10,
+          "priority": 3,
+          "period": 50,
+          "deadline": 50,
+          "offset": 0
+        },
+        {
+          "name": "Bad",
+          "id": 1,
+          "workload": 60,
+          "priority": 1,
+          "period": 40,
+          "deadline": 40,
+          "offset": 0
+        }
+      ],
+      "must_have": [
+        "task=Safe START",
+        "task=Safe END",
+        "task=Bad DEADLINE_MISS",
+        "task=Bad OVERRUN -> SKIP"
+      ],
+      "must_not_have": [
+        "task=Safe DEADLINE_MISS",
+        "CATCH_UP",
+        "KILL"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Non-harmonic 3-task set - schedulable (no miss)",
+      "policy": "POLICY_SKIP",
+      "tasks": [
+        {
+          "name": "TaskA",
+          "id": 0,
+          "workload": 8,
+          "priority": 3,
+          "period": 30,
+          "deadline": 30,
+          "offset": 0
+        },
+        {
+          "name": "TaskB",
+          "id": 1,
+          "workload": 8,
+          "priority": 2,
+          "period": 50,
+          "deadline": 50,
+          "offset": 0
+        },
+        {
+          "name": "TaskC",
+          "id": 2,
+          "workload": 8,
+          "priority": 1,
+          "period": 70,
+          "deadline": 70,
+          "offset": 0
+        }
+      ],
+      "must_have": [
+        "task=TaskA END",
+        "task=TaskB END",
+        "task=TaskC END"
+      ],
+      "must_not_have": [
+        "DEADLINE_MISS",
+        "OVERRUN"
+      ]
     }
   ]
 }

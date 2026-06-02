@@ -11,7 +11,7 @@ void delay_routine(TickType_t wcetTicks)
     TickType_t xExecutedTicks = 0;
     TickType_t xCurrentTickCount;
     
-    while (xExecutedTicks <= wcetTicks)
+    while (xExecutedTicks < wcetTicks)
     {
 
         xCurrentTickCount = xTaskGetTickCount(); 

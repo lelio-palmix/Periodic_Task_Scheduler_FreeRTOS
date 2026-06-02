@@ -69,18 +69,22 @@ def run_test(test_config):
 
 if __name__ == "__main__":
     print("\n--- Starting Automated Test Suite ---")
-    
+
+    from generate_tests import generate_h
+    generate_h()
+
     with open('test_cases.json', 'r') as f:
         data = json.load(f)
-        
+
     all_passed = True
     for test in data['tests']:
         if not run_test(test):
             all_passed = False
-            
+
     print("\n" + "="*40)
 
-    os.remove("test.h")
+    if os.path.exists("test.h"):
+        os.remove("test.h")
 
     if all_passed:
         print("FINAL STATUS: ALL TESTS PASSED")

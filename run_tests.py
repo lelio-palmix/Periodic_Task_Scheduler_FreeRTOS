@@ -3,6 +3,65 @@ import sys
 import json
 import os
 import signal
+import math
+from functools import reduce
+
+
+def dm_guarantee(tasks):
+    """Necessary and Sufficient condition for Rate Monotonic scheduling.
+    Tasks must be ordered by higher priority (i.e. 1/T).
+    Returns True if schedulable, False otherwise.
+    """
+    sorted_tasks = sorted(tasks, key=lambda t: t["deadline"])
+    response_times = []
+
+    for i, task in enumerate(sorted_tasks):
+        Ci = task["workload"]
+        Di = task["deadline"]
+        I = 0
+        while True:
+            R = I + Ci
+            if R > Di:
+                response_times.append((task["name"], None, Di))
+                return False
+            I_new = sum(
+                math.ceil(R / st["period"]) * st["workload"]
+                for st in sorted_tasks[:i]
+            )
+            if I_new + Ci <= R:
+                response_times.append((task["name"], R, Di))
+                break
+            I = I_new
+
+    return True
+
+
+def schedulability_analysis(tests):
+    '''Perform schedulability analysis for each test scenario using:
+    - EDF: Total utilization U <= 1.0 (Necessary and Sufficient)
+    - RM: Product of (Ui + 1) <= 2.0 (Sufficient, not necessary)
+    - RM: Necessary and Sufficient condition
+    '''
+    print("\n--- Schedulability Analysis ---")
+    for test in tests:
+        tasks = test["tasks"]
+        utils = [t["workload"] / t["period"] for t in tasks]
+        total_util = sum(utils)
+
+        edf_ok = total_util <= 1.0
+        rm_ok = reduce(lambda acc, u: acc * (u + 1), utils, 1.0) <= 2.0
+        dm_ok = dm_guarantee(tasks)
+
+        print(f"\n  Test {test['id']}: {test['name']}")
+        print(f"    {'Task':<10} {'C':>4} {'T':>5} {'D':>5} {'U':>6}  {'R (DM)':>10}")
+        for t, u in zip(tasks, utils):
+            print(f"    {t['name']:<10} {t['workload']:>4} {t['period']:>5} {t['deadline']:>5} {u:>6.3f}  ")
+        print(f"    Total utilization U = {total_util:.4f}")
+        print(f"    EDF (N&S,  U<=1):           {'FEASIBLE' if edf_ok else 'NOT FEASIBLE'}")
+        print(f"    RM  (suff, prod(Ui+1)<=2):  {'FEASIBLE' if rm_ok else 'NOT FEASIBLE'}")
+        print(f"    DM  (N&S,  response time):  {'FEASIBLE' if dm_ok else 'NOT FEASIBLE'}")
+    print("\n" + "-" * 40)
+
 
 def run_test(test_config):
     """Run a single test scenario based on the provided configuration.
@@ -36,7 +95,7 @@ def run_test(test_config):
         
         # Running with a timeout to prevent hangs. If QEMU doesn't finish in time, we kill it.
         try:
-            output, _ = process.communicate(timeout=3.0)
+            output, _ = process.communicate(timeout=2.0)
         except subprocess.TimeoutExpired:
             os.killpg(os.getpgid(process.pid), signal.SIGTERM)
             output, _ = process.communicate()
@@ -70,11 +129,13 @@ def run_test(test_config):
 if __name__ == "__main__":
     print("\n--- Starting Automated Test Suite ---")
 
-    from generate_tests import generate_h
-    generate_h()
-
     with open('test_cases.json', 'r') as f:
         data = json.load(f)
+
+    schedulability_analysis(data['tests'])
+
+    from generate_tests import generate_h
+    generate_h()
 
     all_passed = True
     for test in data['tests']:

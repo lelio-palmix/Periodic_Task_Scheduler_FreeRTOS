@@ -49,7 +49,7 @@
 #define configUSE_TICK_HOOK                      1//Start vApplicationTickHook
 #define configCPU_CLOCK_HZ                       ( ( unsigned long ) 25000000 )
 #define configTICK_RATE_HZ                       ( ( TickType_t ) 1000 )
-#define configMINIMAL_STACK_SIZE                 ( ( unsigned short ) 4096 )
+#define configMINIMAL_STACK_SIZE                 ( ( unsigned short ) 256 ) // change from 4096 to 256 to reduce memory usage
 #define configTOTAL_HEAP_SIZE                    ( ( size_t ) ( 60 * 1024 ) )
 #define configMAX_TASK_NAME_LEN                  ( 12 )
 #define configUSE_16_BIT_TICKS                   0

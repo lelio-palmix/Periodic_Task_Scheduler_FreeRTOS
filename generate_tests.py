@@ -39,7 +39,7 @@ def generate_h():
             for i, t in enumerate(test['tasks']):
                 var_name = f'work{test["id"]}_{t["name"]}'
                 out.write(f'            static int {var_name} = {t["workload"]};\n')
-                out.write(f'            tasks[{i}] = (TaskConfig){{"{t["name"]}", {t["id"]}, TaskTest_wrap, &{var_name}, 512, {t["priority"]}, {t["period"]}, {t["deadline"]}, {t.get("offset", 0)}}};\n')
+                out.write(f'            tasks[{i}] = (TaskConfig){{"{t["name"]}", {t["id"]}, TaskTest_wrap, &{var_name}, configMINIMAL_STACK_SIZE, {t["priority"]}, {t["period"]}, {t["deadline"]}, {t.get("offset", 0)}}};\n')
             out.write('            break;\n')
 
         out.write('        default:\n')

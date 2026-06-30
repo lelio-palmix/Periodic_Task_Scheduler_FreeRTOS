@@ -17,14 +17,25 @@
 /* Configuration constants */
 #define QUEUE_LENGTH 30
 #define MESSAGE_LENGTH 60
-#define DEFAULT_STACK_SIZE 512
 #define MAX_TASKS 8
-#define BASE_PRIORITY 2
 
+/* User-defined constants for task priorities */
+#define BASE_USER_PRIORITY 1 
+#define MAX_USER_PRIORITY 5
+
+/* 0 = Do not handle log starvation
+** 1 = Handle log starvation
+** Can be overridden at compile time via -DHANDLE_LOG_STARVATION=0/1 */
+#ifndef HANDLE_LOG_STARVATION
+#define HANDLE_LOG_STARVATION 1
+#endif
 
 /* 0 = Just log and change xLastWakeUpTime (pretty much like SKIP)
-** 1 = Kill the current job and release the new one, then log the previous job as missed (similar to KILL with different log) */
+** 1 = Kill the current job and release the new one, then log the previous job as missed (similar to KILL with different log)
+** Can be overridden at compile time via -DCATCH_UP_VERSION=0/1 */
+#ifndef CATCH_UP_VERSION
 #define CATCH_UP_VERSION 0
+#endif
 
 /* Task running state: whether a job is currently executing or not. */
 typedef enum

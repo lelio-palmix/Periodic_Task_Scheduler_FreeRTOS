@@ -232,6 +232,7 @@ void Init(const SchedulerConfig sconfig)
         while (1)
             ;
     }
+    uint8_t max_priority = 1; // Initialize max_priority to the lowest priority (1)
 
     /* Create tasks based on the configuration */
     for (int i = 0; i < sconfig.num_tasks; i++)
@@ -244,8 +245,25 @@ void Init(const SchedulerConfig sconfig)
             task->deadline = task->period_ms;
         }
 
-        task->idTask = i;
+        // Priority chosen by the user can be from 1 to 5
+        if(task->uxPriority <BASE_USER_PRIORITY)
+        {
+           task->uxPriority = BASE_USER_PRIORITY + 1;
+        }else if(task->uxPriority > MAX_USER_PRIORITY)
+        {
+            task->uxPriority = MAX_USER_PRIORITY + 1;
+        }else{
+            task->uxPriority = task->uxPriority +1; // Add 1 to avoid priority of the logging task (1)
+        }
 
+        // Update max_priority if the current task's priority is higher
+        if (task->uxPriority > max_priority)
+        {
+            max_priority = task->uxPriority;
+        }
+
+        task->idTask = i;
+        
         snprintf((char *)taskState[i].name, sizeof(taskState[i].name), "%s", task->name);
         taskState[i].policy = sconfig.policy;
         taskState[i].state = TASK_NOT_RUNNING;
@@ -259,16 +277,25 @@ void Init(const SchedulerConfig sconfig)
         xTaskCreate(Task_Function,
                     task->name,
                     task->stackDepth,
-                    task,
+                    &taskState[i].taskConfig,
                     task->uxPriority,
                     &taskState[i].task);
     }
 
-    /* Create logging task */
-    xTaskCreate(LoggingTask, "LoggingTask", DEFAULT_STACK_SIZE, NULL, 2, NULL);
+    if(HANDLE_LOG_STARVATION)
+    {
+        // If HANDLE_LOG_STARVATION is enabled, set the logging task's priority to max_priority 
+        xTaskCreate(LoggingTask, "LoggingTask", configMINIMAL_STACK_SIZE, NULL, max_priority , NULL);
+    }
+    else
+    {
+        // If HANDLE_LOG_STARVATION is disabled, set the logging task's priority to 1
+        xTaskCreate(LoggingTask, "LoggingTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    }
 
-    /* Create interrupt task */
-    xTaskCreate(Interrupt_task, "InterruptTask", DEFAULT_STACK_SIZE, NULL, 4, NULL);
+    
+    /* Create the interrupt task with a priority higher than the maximum user task priority */
+    xTaskCreate(Interrupt_task, "InterruptTask", configMINIMAL_STACK_SIZE, NULL, max_priority + 1, NULL);
 
     /* Start the scheduler */
     vTaskStartScheduler();

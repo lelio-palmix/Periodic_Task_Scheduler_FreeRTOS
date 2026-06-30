@@ -7,6 +7,14 @@ import math
 from functools import reduce
 
 
+def ask_flag(name, description):
+    while True:
+        answer = input(f"{name} ({description}) [0/1]: ").strip()
+        if answer in ("0", "1"):
+            return int(answer)
+        print("  Please enter 0 or 1.")
+
+
 def dm_guarantee(tasks):
     """Necessary and Sufficient condition for Rate Monotonic scheduling.
     Tasks must be ordered by higher priority (i.e. 1/T).
@@ -71,13 +79,15 @@ def run_test(test_config):
     3) Captures the output and validates it against the expected results defined in the test configuration.
     """
     
+    global HANDLE_LOG_STARVATION, CATCH_UP_VERSION
+
     test_id = test_config["id"]
     test_name = test_config["name"]
     
     print(f"\n[+] Running Test {test_id}: {test_name}")
     
     # 1. Compilation with test-specific flag
-    compile_cmd = f"make clean && make EXTRA_CFLAGS='-DTEST_ID={test_id}' all"
+    compile_cmd = f"make clean && make EXTRA_CFLAGS='-DTEST_ID={test_id} -DHANDLE_LOG_STARVATION={HANDLE_LOG_STARVATION} -DCATCH_UP_VERSION={CATCH_UP_VERSION}' all"
     subprocess.run(compile_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     if not os.path.exists("./Output/demo.elf"):
@@ -128,6 +138,16 @@ def run_test(test_config):
 
 if __name__ == "__main__":
     print("\n--- Starting Automated Test Suite ---")
+
+    print("\n--- Flags Configuration ---")
+    HANDLE_LOG_STARVATION = ask_flag(
+        "HANDLE_LOG_STARVATION",
+        "0 = disabled, 1 = enabled"
+    )
+    CATCH_UP_VERSION = ask_flag(
+        "CATCH_UP_VERSION",
+        "0 = Similar to SKIP, 1 = Similar to KILL"
+    )
 
     with open('test_cases.json', 'r') as f:
         data = json.load(f)

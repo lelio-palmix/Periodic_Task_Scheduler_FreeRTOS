@@ -12,13 +12,13 @@
 
 int main(void)
 {
-    UART_init();
-    TaskConfig tasks[MAX_TASKS];
-    SchedulerConfig sconfig;
+    vUartInit();
+    TaskConfig xTasks[MAX_TASKS];
+    SchedulerConfig xSchedulerConfig;
 
-    load_test_scenario(TEST_ID, &sconfig, tasks);
+    vLoadTestScenario(TEST_ID, &xSchedulerConfig, xTasks);
 
-    Init(sconfig);
+    vPtlInit(xSchedulerConfig);
 
     while (1);
     return 0;

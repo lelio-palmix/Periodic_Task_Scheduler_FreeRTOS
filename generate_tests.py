@@ -20,26 +20,26 @@ def generate_h():
         out.write('#ifndef TEST_H\n#define TEST_H\n\n')
         out.write('#include "ptl.h"\n\n')
         out.write('/* Generic wrapper function: reads workload time from parameters */\n')
-        out.write('void TaskTest_wrap(void *params)\n')
+        out.write('void vTaskTestWrap(void *pvParameters)\n')
         out.write('{\n')
-        out.write('    int duration = *((int *)params);\n')
-        out.write('    delay_routine(pdMS_TO_TICKS(duration));\n')
+        out.write('    int xDuration = *((int *)pvParameters);\n')
+        out.write('    vDelayRoutine(pdMS_TO_TICKS(xDuration));\n')
         out.write('}\n\n')
-        out.write('static inline void load_test_scenario(int test_id, SchedulerConfig *sconfig, TaskConfig *tasks) {\n')
-        out.write('    switch(test_id) {\n')
+        out.write('static inline void vLoadTestScenario(int xTestId, SchedulerConfig *pxSchedulerConfig, TaskConfig *pxTasks) {\n')
+        out.write('    switch(xTestId) {\n')
 
         for test in data['tests']:
             out.write(f'        case {test["id"]}:\n')
-            out.write(f'            sconfig->policy = {test["policy"]};\n')
-            out.write(f'            sconfig->trace_enabled = 1;\n')
-            out.write(f'            sconfig->max_tasks = MAX_TASKS;\n')
-            out.write(f'            sconfig->tasks = tasks;\n')
-            out.write(f'            sconfig->num_tasks = {len(test["tasks"])};\n')
-            
+            out.write(f'            pxSchedulerConfig->ePolicy = {test["policy"]};\n')
+            out.write(f'            pxSchedulerConfig->xTraceEnabled = 1;\n')
+            out.write(f'            pxSchedulerConfig->xMaxTasks = MAX_TASKS;\n')
+            out.write(f'            pxSchedulerConfig->pxTasks = pxTasks;\n')
+            out.write(f'            pxSchedulerConfig->xNumTasks = {len(test["tasks"])};\n')
+
             for i, t in enumerate(test['tasks']):
                 var_name = f'work{test["id"]}_{t["name"]}'
                 out.write(f'            static int {var_name} = {t["workload"]};\n')
-                out.write(f'            tasks[{i}] = (TaskConfig){{"{t["name"]}", {t["id"]}, TaskTest_wrap, &{var_name}, configMINIMAL_STACK_SIZE, {t["priority"]}, {t["period"]}, {t["deadline"]}, {t.get("offset", 0)}}};\n')
+                out.write(f'            pxTasks[{i}] = (TaskConfig){{"{t["name"]}", {t["id"]}, vTaskTestWrap, &{var_name}, configMINIMAL_STACK_SIZE, {t["priority"]}, {t["period"]}, {t["deadline"]}, {t.get("offset", 0)}}};\n')
             out.write('            break;\n')
 
         out.write('        default:\n')

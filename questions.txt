@@ -1,5 +1,0 @@
-1) Policy KILL: cosa si intende per "stoppare" il job, considerando che poi bisogna rilasciare il job successivo immediatamente?
-2) Policy CATCH-UP: stesso dubbio di kill, e come "marcare" il job mancato effettivamente? Basta una "loggata" o si deve fare anche altro?
-3) Il logging lo inviamo alla UART o lo salviamo in un file?
-4) Cosa si intende per gli handle degli errori? Possiamo avere un esempio pratico?
-5) "✅ Modified FreeRTOS kernel with timeline-based scheduler" è un errore o vale anche per noi?

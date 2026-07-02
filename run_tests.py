@@ -1,3 +1,4 @@
+import argparse
 import subprocess
 import sys
 import json
@@ -5,6 +6,8 @@ import os
 import signal
 import math
 from functools import reduce
+
+DEFAULT_QEMU_TIMEOUT = 2.0
 
 
 def ask_flag(name, description):
@@ -88,10 +91,13 @@ def run_test(test_config):
     
     # 1. Compilation with test-specific flag
     compile_cmd = f"make clean && make EXTRA_CFLAGS='-DTEST_ID={test_id} -DHANDLE_LOG_STARVATION={HANDLE_LOG_STARVATION} -DCATCH_UP_VERSION={CATCH_UP_VERSION}' all"
-    subprocess.run(compile_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    if not os.path.exists("./Output/demo.elf"):
+    compile_result = subprocess.run(compile_cmd, shell=True, capture_output=True, text=True)
+
+    if compile_result.returncode != 0 or not os.path.exists("./Output/demo.elf"):
         print(f"  [!] Compilation failed for Test {test_id}")
+        print("\n--- DEBUG: COMPILER OUTPUT ---")
+        print(compile_result.stderr if compile_result.stderr else compile_result.stdout)
+        print("------------------------------\n")
         return False
 
     # 2. Execution in QEMU
@@ -104,8 +110,9 @@ def run_test(test_config):
         process = subprocess.Popen(qemu_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, preexec_fn=os.setsid)
         
         # Running with a timeout to prevent hangs. If QEMU doesn't finish in time, we kill it.
+        # Each scenario can override the default via a "timeout" key in test_cases.json.
         try:
-            output, _ = process.communicate(timeout=2.0)
+            output, _ = process.communicate(timeout=test_config.get("timeout", DEFAULT_QEMU_TIMEOUT))
         except subprocess.TimeoutExpired:
             os.killpg(os.getpgid(process.pid), signal.SIGTERM)
             output, _ = process.communicate()
@@ -137,17 +144,35 @@ def run_test(test_config):
     return passed
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Compile and run every scenario in test_cases.json under QEMU. "
+                    "Flags not passed on the command line are asked interactively."
+    )
+    parser.add_argument("--handle-log-starvation", type=int, choices=[0, 1], default=None,
+                        help="0 = disabled, 1 = enabled")
+    parser.add_argument("--catch-up-version", type=int, choices=[0, 1], default=None,
+                        help="0 = Similar to SKIP, 1 = Similar to KILL")
+    args = parser.parse_args()
+
     print("\n--- Starting Automated Test Suite ---")
 
     print("\n--- Flags Configuration ---")
-    HANDLE_LOG_STARVATION = ask_flag(
-        "HANDLE_LOG_STARVATION",
-        "0 = disabled, 1 = enabled"
-    )
-    CATCH_UP_VERSION = ask_flag(
-        "CATCH_UP_VERSION",
-        "0 = Similar to SKIP, 1 = Similar to KILL"
-    )
+    if args.handle_log_starvation is not None:
+        HANDLE_LOG_STARVATION = args.handle_log_starvation
+        print(f"HANDLE_LOG_STARVATION = {HANDLE_LOG_STARVATION}")
+    else:
+        HANDLE_LOG_STARVATION = ask_flag(
+            "HANDLE_LOG_STARVATION",
+            "0 = disabled, 1 = enabled"
+        )
+    if args.catch_up_version is not None:
+        CATCH_UP_VERSION = args.catch_up_version
+        print(f"CATCH_UP_VERSION = {CATCH_UP_VERSION}")
+    else:
+        CATCH_UP_VERSION = ask_flag(
+            "CATCH_UP_VERSION",
+            "0 = Similar to SKIP, 1 = Similar to KILL"
+        )
 
     with open('test_cases.json', 'r') as f:
         data = json.load(f)

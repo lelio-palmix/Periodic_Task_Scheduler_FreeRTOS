@@ -286,16 +286,25 @@ Run the whole suite:
 python3 run_tests.py
 ```
 
+For non-interactive use, the flags can be passed on the command line:
+
+```sh
+python3 run_tests.py --handle-log-starvation 1 --catch-up-version 0
+```
+
 The runner ([run_tests.py](run_tests.py)) will:
 
-1. Prompt for the `HANDLE_LOG_STARVATION` and `CATCH_UP_VERSION` flags.
+1. Prompt for the `HANDLE_LOG_STARVATION` and `CATCH_UP_VERSION` flags
+   (skipped for any flag passed on the command line).
 2. Print a **schedulability analysis** for every scenario:
    - **EDF** - necessary &amp; sufficient utilisation bound `U ≤ 1`.
    - **RM** - sufficient hyperbolic bound `∏(Uᵢ + 1) ≤ 2`.
    - **DM** - necessary &amp; sufficient response-time analysis.
 3. Generate `test.h` from the JSON via [generate_tests.py](generate_tests.py).
-4. For each scenario: `make clean && make -DTEST_ID=<n> …`, run it under QEMU (with a timeout),
-   capture the serial trace, and check it against the `must_have` / `must_not_have` oracle.
+4. For each scenario: `make clean && make -DTEST_ID=<n> …`, run it under QEMU
+   (killed after 2 s by default; a scenario can override this with a `"timeout"`
+   key, in seconds, in `test_cases.json`), capture the serial trace, and check it
+   against the `must_have` / `must_not_have` oracle.
 5. Print a per-test `PASSED`/`FAILED` result and a final aggregate status.
 
 The 15 shipped scenarios cover baseline periodic execution, RM preemption, single- and

@@ -89,9 +89,9 @@ void vPtlInterruptTask(void *pvParameters)
             case POLICY_CATCH_UP:
                 xEvent.eEventType = LOG_OVERRUN_CATCHUP;
                 xEvent.ulMissedJob = xTaskStates[xId].ulK;
-                #if(CATCH_UP_VERSION == 1)
-                    uxPtlApplyKillPolicy(&xTaskStates[xId].xTaskConfig, xId);
-                #endif
+#if (CATCH_UP_VERSION == 1)
+                uxPtlApplyKillPolicy(&xTaskStates[xId].xTaskConfig, xId);
+#endif
                 break;
             case POLICY_KILL:
                 xEvent.eEventType = LOG_OVERRUN_KILL;
@@ -137,8 +137,6 @@ void vPtlTaskBody(void *pvParameters)
         pxTaskBody(xTaskConfig.pvParams);
 
         xLastJobCompleted = xTaskGetTickCount();
-
-
 
         /* Update task state for the next period */
         taskENTER_CRITICAL();
@@ -187,11 +185,11 @@ void vPtlLoggingTask(void *pvParameters)
                          (unsigned long)xEvent.xTimestamp, pcName);
                 break;
             case LOG_OVERRUN_CATCHUP:
-                #if(CATCH_UP_VERSION==1)
-                    snprintf(pcBuffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP job=%lu\n", (unsigned long)xEvent.xTimestamp, pcName,(unsigned long)xEvent.ulMissedJob);
-                #else
-                    snprintf(pcBuffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP\n", (unsigned long)xEvent.xTimestamp, pcName);
-                #endif
+#if (CATCH_UP_VERSION == 1)
+                snprintf(pcBuffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP job=%lu\n", (unsigned long)xEvent.xTimestamp, pcName, (unsigned long)xEvent.ulMissedJob);
+#else
+                snprintf(pcBuffer, MESSAGE_LENGTH, "[WARN] t=%lu task=%s OVERRUN -> CATCH_UP\n", (unsigned long)xEvent.xTimestamp, pcName);
+#endif
 
                 break;
             case LOG_OVERRUN_KILL:
@@ -258,14 +256,17 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig)
         }
 
         // Priority chosen by the user can be from 1 to 5
-        if(pxTaskConfig->uxPriority < BASE_USER_PRIORITY)
+        if (pxTaskConfig->uxPriority < BASE_USER_PRIORITY)
         {
-           pxTaskConfig->uxPriority = BASE_USER_PRIORITY + 1;
-        }else if(pxTaskConfig->uxPriority > MAX_USER_PRIORITY)
+            pxTaskConfig->uxPriority = BASE_USER_PRIORITY + 1;
+        }
+        else if (pxTaskConfig->uxPriority > MAX_USER_PRIORITY)
         {
             pxTaskConfig->uxPriority = MAX_USER_PRIORITY + 1;
-        }else{
-            pxTaskConfig->uxPriority = pxTaskConfig->uxPriority +1; // Add 1 to avoid priority of the logging task (1)
+        }
+        else
+        {
+            pxTaskConfig->uxPriority = pxTaskConfig->uxPriority + 1; // Add 1 to avoid priority of the logging task (1)
         }
 
         // Update ucMaxPriority if the current task's priority is higher
@@ -295,10 +296,10 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig)
     }
 
 #if (TRACE_ENABLED == 1)
-    if(HANDLE_LOG_STARVATION)
+    if (HANDLE_LOG_STARVATION)
     {
         // If HANDLE_LOG_STARVATION is enabled, set the logging task's priority to ucMaxPriority
-        xTaskCreate(vPtlLoggingTask, "LoggingTask", configMINIMAL_STACK_SIZE, NULL, ucMaxPriority , NULL);
+        xTaskCreate(vPtlLoggingTask, "LoggingTask", configMINIMAL_STACK_SIZE, NULL, ucMaxPriority, NULL);
     }
     else
     {
@@ -306,7 +307,6 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig)
         xTaskCreate(vPtlLoggingTask, "LoggingTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     }
 #endif
-
 
     /* Create the interrupt task with a priority higher than the maximum user task priority */
     xTaskCreate(vPtlInterruptTask, "InterruptTask", configMINIMAL_STACK_SIZE, NULL, ucMaxPriority + 1, NULL);

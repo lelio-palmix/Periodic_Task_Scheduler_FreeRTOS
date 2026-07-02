@@ -3,18 +3,18 @@
 #include "task.h"
 
 /*
- * Busy-wait for `wcetTicks` ticks.
+ * Busy-wait for `xWcetTicks` ticks.
  */
-void delay_routine(TickType_t wcetTicks)
+void vDelayRoutine(TickType_t xWcetTicks)
 {
     TickType_t xLastTickCount = xTaskGetTickCount();
     TickType_t xExecutedTicks = 0;
     TickType_t xCurrentTickCount;
-    
-    while (xExecutedTicks <= wcetTicks)
+
+    while (xExecutedTicks < xWcetTicks)
     {
 
-        xCurrentTickCount = xTaskGetTickCount(); 
+        xCurrentTickCount = xTaskGetTickCount();
         if(xLastTickCount != xCurrentTickCount){
             xExecutedTicks++;
             xLastTickCount = xCurrentTickCount;

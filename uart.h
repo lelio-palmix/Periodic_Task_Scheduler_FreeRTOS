@@ -9,7 +9,7 @@
 #define UART0_CTRL                            ( *( ( ( volatile uint32_t * ) ( UART0_ADDRESS + 8UL ) ) ) )
 #define UART0_BAUDDIV                         ( *( ( ( volatile uint32_t * ) ( UART0_ADDRESS + 16UL ) ) ) )
 
-void UART_init(void);
-void UART_printf(const char *s);
+void vUartInit(void);
+void vUartPrintf(const char *pcString);
 
 #endif

@@ -1,14 +1,14 @@
 #include "uart.h"
 
-void UART_init( void )
+void vUartInit( void )
 {
     UART0_BAUDDIV = 16;
     UART0_CTRL = 1;
 }
 
-void UART_printf(const char *s) {
-    while(*s != '\0') {
-        UART0_DATA = (unsigned int)(*s);
-        s++;
+void vUartPrintf(const char *pcString) {
+    while(*pcString != '\0') {
+        UART0_DATA = (unsigned int)(*pcString);
+        pcString++;
     }
 }

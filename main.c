@@ -1,80 +1,58 @@
+#include <stdio.h>
 #include "FreeRTOS.h"
 #include "task.h"
 #include "uart.h"
 #include "delay.h"
 #include "ptl.h"
 
-void TaskTest_wrap(void *params)
-{
-    char *taskName = (char *)params;
-    if (taskName == NULL) return;
+#ifndef TEST_ID
+#define TEST_ID 1
+#endif
 
-    if (taskName[4] == 'A' || taskName[4] == 'B') {
-        delay_routine(pdMS_TO_TICKS(80));
-    } else {
-        delay_routine(pdMS_TO_TICKS(5));
-    }
-}
 
+#include "test.h"
 int main(void)
 {
-    UART_init();
-    
-    /* Task configuration */
-    TaskConfig task1 = {
-        .name = "TaskA",
-        .idTask = 0,
-        .taskBody = TaskTest_wrap, 
-        .params = (void* )"TaskA", 
-        .stackDepth = DEFAULT_STACK_SIZE,
-        .uxPriority = 2,
-        .period_ms = 30,
-        .deadline = 5, 
-        .offset_ms = 0
-    };
-    
-    TaskConfig task2 = {
-        .name = "TaskB",
-        .idTask = 1,
-        .taskBody = TaskTest_wrap,  
-        .params = (void* )"TaskB", 
-        .stackDepth = DEFAULT_STACK_SIZE,
-        .uxPriority = 2,
-        .period_ms = 30,
-        .deadline = 5, 
-        .offset_ms = 15
-    };
-    
-    TaskConfig task3 = {
-        .name = "TaskC",
-        .idTask = 2,
-        .taskBody = TaskTest_wrap,  
-        .params = (void* )"TaskC", 
-        .stackDepth = DEFAULT_STACK_SIZE,
-        .uxPriority = 2,
-        .period_ms = 100,
-        .deadline = 100,
-        .offset_ms = 0
-    };
+    vUartInit();
+    TaskConfig xTasks[MAX_TASKS];
+    SchedulerConfig xSchedulerConfig;
 
-    TaskConfig tasks[MAX_TASKS];
-    tasks[0] = task1;
-    tasks[1] = task2;
-    tasks[2] = task3;
+    vLoadTestScenario(TEST_ID, &xSchedulerConfig, xTasks);
 
-    /* Scheduler configuration */
-    SchedulerConfig sconfig = {
-         .policy = POLICY_CATCH_UP,
-         .trace_enabled = 1,
-         .max_tasks = MAX_TASKS,
-         .tasks = tasks,
-         .num_tasks = 3
-    };
+    vPtlInit(xSchedulerConfig);
 
-    /* Call the initialization function for PTL scheduler */
-    Init(sconfig);
-
-    while (1);
-    
+    while (1)
+        ;
     return 0;
 }
+
+
+// void vTaskTestWrap(void *pvParameters)
+// {
+//     int xDuration = *((int *)pvParameters);
+//     vDelayRoutine(pdMS_TO_TICKS(xDuration));
+// }
+
+// int main(void)
+// {
+//     vUartInit();
+//     TaskConfig xTasks[MAX_TASKS];
+//     SchedulerConfig xSchedulerConfig;
+
+//     xSchedulerConfig.ePolicy = POLICY_SKIP;
+//     xSchedulerConfig.xTraceEnabled = 1;
+//     xSchedulerConfig.xMaxTasks = MAX_TASKS;
+//     xSchedulerConfig.pxTasks = xTasks;
+//     xSchedulerConfig.xNumTasks = 3;
+//     static int work11_TaskA = 10;
+//     xTasks[0] = (TaskConfig){"TaskA", 0, vTaskTestWrap, &work11_TaskA, configMINIMAL_STACK_SIZE, 3, 60, 60, 0};
+//     static int work11_TaskB = 10;
+//     xTasks[1] = (TaskConfig){"TaskB", 1, vTaskTestWrap, &work11_TaskB, configMINIMAL_STACK_SIZE, 3, 60, 90, 15};
+//     static int work11_TaskC = 10;
+//     xTasks[2] = (TaskConfig){"TaskC", 2, vTaskTestWrap, &work11_TaskC, configMINIMAL_STACK_SIZE, 3, 60, 60, 30};
+//     vPtlInit(xSchedulerConfig);
+
+//     while (1)
+//         ;
+//     return 0;
+// }

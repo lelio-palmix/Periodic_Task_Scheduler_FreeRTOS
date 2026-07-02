@@ -40,7 +40,6 @@ int main(void)
 //     SchedulerConfig xSchedulerConfig;
 
 //     xSchedulerConfig.ePolicy = POLICY_SKIP;
-//     xSchedulerConfig.xTraceEnabled = 1;
 //     xSchedulerConfig.xMaxTasks = MAX_TASKS;
 //     xSchedulerConfig.pxTasks = xTasks;
 //     xSchedulerConfig.xNumTasks = 3;

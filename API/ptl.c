@@ -48,7 +48,7 @@ void vApplicationTickHook(void)
                 xEvent.xTaskId = i;
                 xEvent.eEventType = LOG_DEADLINE_MISS;
                 xEvent.ulMissedJob = 0;
-                xQueueSendFromISR(xLogQueue, &xEvent, 0);
+                ptlTRACE_EVENT_FROM_ISR(&xEvent, 0);
             }
 
             const TickType_t xNextRelease = xTaskStates[i].xLastWakeUpTime + xPeriod;
@@ -101,7 +101,7 @@ void vPtlInterruptTask(void *pvParameters)
             default:
                 break;
             }
-            xQueueSend(xLogQueue, &xEvent, (TickType_t)0);
+            ptlTRACE_EVENT(&xEvent);
         }
     }
 }
@@ -132,7 +132,7 @@ void vPtlTaskBody(void *pvParameters)
         xEvent.xTaskId = xIdTask;
         xEvent.eEventType = LOG_START;
         xEvent.ulMissedJob = 0;
-        xQueueSend(xLogQueue, &xEvent, (TickType_t)0);
+        ptlTRACE_EVENT(&xEvent);
 
         pxTaskBody(xTaskConfig.pvParams);
 
@@ -150,13 +150,14 @@ void vPtlTaskBody(void *pvParameters)
         xEvent.xTaskId = xIdTask;
         xEvent.eEventType = LOG_END;
         xEvent.ulMissedJob = 0;
-        xQueueSend(xLogQueue, &xEvent, (TickType_t)0);
+        ptlTRACE_EVENT(&xEvent);
 
         /* Wait until the next release time */
         xTaskDelayUntil(&xTaskStates[xIdTask].xLastWakeUpTime, xPeriod);
     }
 }
 
+#if (TRACE_ENABLED == 1)
 void vPtlLoggingTask(void *pvParameters)
 {
     (void)pvParameters;
@@ -204,6 +205,7 @@ void vPtlLoggingTask(void *pvParameters)
         }
     }
 }
+#endif /* TRACE_ENABLED == 1 */
 
 void vPtlInit(const SchedulerConfig xSchedulerConfig)
 {
@@ -215,6 +217,7 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig)
             ;
     }
 
+#if (TRACE_ENABLED == 1)
     xLogQueue = xQueueCreate(QUEUE_LENGTH, sizeof(LogEvent));
 
     if (xLogQueue == NULL)
@@ -223,6 +226,7 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig)
         while (1)
             ;
     }
+#endif
 
     /* Overrun queue of length MAX_TASKS because each task can have at most one overrun at a time */
     xOverrunQueue = xQueueCreate(MAX_TASKS, sizeof(int));
@@ -290,6 +294,7 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig)
                     &xTaskStates[i].xTask);
     }
 
+#if (TRACE_ENABLED == 1)
     if(HANDLE_LOG_STARVATION)
     {
         // If HANDLE_LOG_STARVATION is enabled, set the logging task's priority to ucMaxPriority
@@ -300,6 +305,7 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig)
         // If HANDLE_LOG_STARVATION is disabled, set the logging task's priority to 1
         xTaskCreate(vPtlLoggingTask, "LoggingTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
     }
+#endif
 
 
     /* Create the interrupt task with a priority higher than the maximum user task priority */

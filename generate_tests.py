@@ -31,7 +31,6 @@ def generate_h():
         for test in data['tests']:
             out.write(f'        case {test["id"]}:\n')
             out.write(f'            pxSchedulerConfig->ePolicy = {test["policy"]};\n')
-            out.write(f'            pxSchedulerConfig->xTraceEnabled = 1;\n')
             out.write(f'            pxSchedulerConfig->xMaxTasks = MAX_TASKS;\n')
             out.write(f'            pxSchedulerConfig->pxTasks = pxTasks;\n')
             out.write(f'            pxSchedulerConfig->xNumTasks = {len(test["tasks"])};\n')

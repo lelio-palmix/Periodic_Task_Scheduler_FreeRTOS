@@ -37,6 +37,24 @@
 #define CATCH_UP_VERSION 0
 #endif
 
+/* 0 = Tracing disabled: no trace events are queued or printed on the UART,
+**     and the log queue and logging task are not created.
+** 1 = Tracing enabled
+** Can be overridden at compile time via -DTRACE_ENABLED=0/1 */
+#ifndef TRACE_ENABLED
+#define TRACE_ENABLED 1
+#endif
+
+/* Trace macros: forward a LogEvent to the log queue when tracing is enabled;
+   compile to no-ops when disabled. */
+#if (TRACE_ENABLED == 1)
+#define ptlTRACE_EVENT(pxEvent) xQueueSend(xLogQueue, (pxEvent), (TickType_t)0)
+#define ptlTRACE_EVENT_FROM_ISR(pxEvent, pxWoken) xQueueSendFromISR(xLogQueue, (pxEvent), (pxWoken))
+#else
+#define ptlTRACE_EVENT(pxEvent) ((void)(pxEvent))
+#define ptlTRACE_EVENT_FROM_ISR(pxEvent, pxWoken) ((void)(pxEvent), (void)(pxWoken))
+#endif
+
 /* Task running state: whether a job is currently executing or not. */
 typedef enum
 {
@@ -110,7 +128,6 @@ typedef struct
 typedef struct
 {
     TaskPolicy ePolicy;  /* Global overrun policy applied to all tasks */
-    int xTraceEnabled;   /* Non-zero to enable trace/logging output */
     int xMaxTasks;       /* Maximum number of tasks allowed */
     TaskConfig *pxTasks; /* Array of task configurations */
     int xNumTasks;       /* Number of valid entries in pxTasks[] */

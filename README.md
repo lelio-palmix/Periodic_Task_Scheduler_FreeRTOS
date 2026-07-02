@@ -188,7 +188,7 @@ The `CATCH_UP` behaviour has two flavours selectable at compile time via `CATCH_
 ## Trace &amp; monitoring output
 
 The logging task prints one line per event over UART with tick-level timestamps. The exact
-formats emitted by [`vPtlLoggingTask`](API/ptl.c#L160) are:
+formats emitted by [`vPtlLoggingTask`](API/ptl.c#L161) are:
 
 ```
 [INFO] t=<tick> task=<name> START
@@ -201,6 +201,17 @@ formats emitted by [`vPtlLoggingTask`](API/ptl.c#L160) are:
 
 The trace captures task start/end ticks and deadline misses / forced terminations, providing a
 tick-resolution timeline suitable for validation and regression checking.
+
+Tracing is controlled by the `TRACE_ENABLED` define ([API/ptl.h](API/ptl.h#L40-L46), default `1`).
+Building with `TRACE_ENABLED=0` compiles tracing out entirely - no events are queued, and the log
+queue and the logging task are not created - so the scheduler runs with zero tracing overhead:
+
+```sh
+make EXTRA_CFLAGS="-DTRACE_ENABLED=0" all
+```
+
+Fatal `[ERROR]` messages from `vPtlInit` are always printed, regardless of `TRACE_ENABLED`.
+See [Compile-time options](#compile-time-options) for the full list of build flags.
 
 ## Building &amp; running
 
@@ -246,14 +257,15 @@ make qemu_start   # run Output/demo.elf
 
 ## Compile-time options
 
-Two behaviours are selectable at build time through `-D` flags (defaults in
-[API/ptl.h](API/ptl.h#L26-L38)):
+Three behaviours are selectable at build time through `-D` flags (defaults in
+[API/ptl.h](API/ptl.h#L26-L46)):
 
 | Flag | Values | Default | Effect |
 |------|--------|---------|--------|
 | `TEST_ID` | `1`–`15` | `1` | Selects which scenario from `test_cases.json` is loaded by `main`. |
 | `HANDLE_LOG_STARVATION` | `0` / `1` | `1` | `1`: logging task runs at the highest user priority to avoid dropped logs under load. `0`: logging task runs at priority 1. |
 | `CATCH_UP_VERSION` | `0` / `1` | `0` | `0`: on overrun just log and advance the release (SKIP-like). `1`: kill the current job, release a fresh one, and log the previous job as missed (KILL-like). |
+| `TRACE_ENABLED` | `0` / `1` | `1` | `1`: trace events are queued and printed on the UART by the logging task. `0`: tracing is compiled out entirely — no log queue, no logging task, zero runtime overhead. |
 
 Example:
 

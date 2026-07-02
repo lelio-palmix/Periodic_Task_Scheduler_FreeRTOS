@@ -54,9 +54,9 @@ periodic behaviour is implemented entirely in user space through the FreeRTOS pu
 | [mps2_m3.ld](mps2_m3.ld) | Linker script for the target board. |
 | [FreeRTOSConfig.h](FreeRTOSConfig.h) | Kernel configuration (tick rate, preemption, tick hook, heap, priorities). |
 | [Makefile](Makefile) | Build, QEMU run, and GDB debug targets. |
-| [test_cases.json](test_cases.json) | Declarative description of all test scenarios. |
-| [generate_tests.py](generate_tests.py) | Generates `test.h` (task scenarios) from `test_cases.json`. |
-| [run_tests.py](run_tests.py) | Regression runner: schedulability analysis + build + QEMU + oracle checks. |
+| [tests/test_cases.json](tests/test_cases.json) | Declarative description of all test scenarios. |
+| [tests/generate_tests.py](tests/generate_tests.py) | Generates `tests/test.h` (task scenarios) from `test_cases.json`. |
+| [tests/run_tests.py](tests/run_tests.py) | Regression runner: schedulability analysis + build + QEMU + oracle checks. |
 | `FreeRTOS/` | Vendored FreeRTOS kernel (not documented here). |
 
 ## How it works
@@ -168,7 +168,7 @@ vPtlInit(xCfg);   /* defines t0, starts all tasks, never returns */
 ```
 
 > In the tests these structures are produced automatically from
-> [test_cases.json](test_cases.json) by [generate_tests.py](generate_tests.py), and
+> [tests/test_cases.json](tests/test_cases.json) by [tests/generate_tests.py](tests/generate_tests.py), and
 > [main.c](main.c) selects a scenario at compile time via `-DTEST_ID=<n>`.
 
 ## Overrun policies
@@ -239,14 +239,14 @@ make            # compile and link -> Output/demo.elf
 ```
 
 To build a specific scenario from the test suite, pass its id (see
-[test_cases.json](test_cases.json)):
+[tests/test_cases.json](tests/test_cases.json)):
 
 ```sh
 make EXTRA_CFLAGS="-DTEST_ID=3" all
 ```
 
-> **Note:** building requires `test.h`, which is generated from the JSON scenarios by
-> `python3 generate_tests.py` (the regression runner does this automatically). `TEST_ID`
+> **Note:** building requires `tests/test.h`, which is generated from the JSON scenarios by
+> `python3 tests/generate_tests.py` (the regression runner does this automatically). `TEST_ID`
 > defaults to `1`.
 
 ### Run in QEMU
@@ -276,23 +276,23 @@ make EXTRA_CFLAGS="-DTEST_ID=4 -DHANDLE_LOG_STARVATION=1 -DCATCH_UP_VERSION=1" a
 ## Testing &amp; regression suite
 
 Testing is fully automated and declarative. Scenarios live in
-[test_cases.json](test_cases.json); each entry defines the policy, the task set
+[tests/test_cases.json](tests/test_cases.json); each entry defines the policy, the task set
 (`workload`, `priority`, `period`, `deadline`, `offset`) and an **oracle** of substrings that
 **must** and **must not** appear in the trace.
 
 Run the whole suite:
 
 ```sh
-python3 run_tests.py
+python3 tests/run_tests.py
 ```
 
 For non-interactive use, the flags can be passed on the command line:
 
 ```sh
-python3 run_tests.py --handle-log-starvation 1 --catch-up-version 0
+python3 tests/run_tests.py --handle-log-starvation 1 --catch-up-version 0
 ```
 
-The runner ([run_tests.py](run_tests.py)) will:
+The runner ([tests/run_tests.py](tests/run_tests.py)) will:
 
 1. Prompt for the `HANDLE_LOG_STARVATION` and `CATCH_UP_VERSION` flags
    (skipped for any flag passed on the command line).
@@ -300,7 +300,7 @@ The runner ([run_tests.py](run_tests.py)) will:
    - **EDF** - necessary &amp; sufficient utilisation bound `U ≤ 1`.
    - **RM** - sufficient hyperbolic bound `∏(Uᵢ + 1) ≤ 2`.
    - **DM** - necessary &amp; sufficient response-time analysis.
-3. Generate `test.h` from the JSON via [generate_tests.py](generate_tests.py).
+3. Generate `tests/test.h` from the JSON via [tests/generate_tests.py](tests/generate_tests.py).
 4. For each scenario: `make clean && make -DTEST_ID=<n> …`, run it under QEMU
    (killed after 2 s by default; a scenario can override this with a `"timeout"`
    key, in seconds, in `test_cases.json`), capture the serial trace, and check it

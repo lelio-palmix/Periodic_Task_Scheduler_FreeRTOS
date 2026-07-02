@@ -1,5 +1,12 @@
 import json
+import os
 import sys
+
+# Paths are anchored to this script's directory so the generator
+# works no matter which directory it is launched from.
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+TEST_CASES_JSON = os.path.join(TESTS_DIR, 'test_cases.json')
+TEST_H = os.path.join(TESTS_DIR, 'test.h')
 
 def generate_h():
     """Generate the test.h file based on the test cases.
@@ -9,13 +16,13 @@ def generate_h():
     3) Writes a header file with the appropriate task configurations for each test scenario.
     """
     try:
-        with open('test_cases.json', 'r') as f:
+        with open(TEST_CASES_JSON, 'r') as f:
             data = json.load(f)
     except FileNotFoundError:
         print("Error: test_cases.json not found.")
         sys.exit(1)
 
-    with open('test.h', 'w') as out:
+    with open(TEST_H, 'w') as out:
         out.write('/* File generated automatically by generate_tests.py */\n')
         out.write('#ifndef TEST_H\n#define TEST_H\n\n')
         out.write('#include "ptl.h"\n\n')

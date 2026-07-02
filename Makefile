@@ -7,6 +7,9 @@ DEMO_PROJECT := .
 #API
 API_DIR := ./API
 
+# Test scenarios (generated test.h lives here)
+TESTS_DIR := ./tests
+
 # FreeRTOS kernel
 KERNEL_DIR := $(FREERTOS_ROOT)/Source
 KERNEL_PORT_DIR := $(KERNEL_DIR)/portable/GCC/ARM_CM3
@@ -34,6 +37,7 @@ QEMU_FLAGS_DBG = -s -S
 INCLUDE_DIRS = -I$(KERNEL_DIR)/include -I$(KERNEL_PORT_DIR)
 INCLUDE_DIRS += -I$(DEMO_PROJECT)
 INCLUDE_DIRS += -I$(API_DIR)
+INCLUDE_DIRS += -I$(TESTS_DIR)
 
 VPATH += $(KERNEL_DIR) $(KERNEL_PORT_DIR) $(KERNEL_DIR)/portable/MemMang
 VPATH += $(DEMO_PROJECT)

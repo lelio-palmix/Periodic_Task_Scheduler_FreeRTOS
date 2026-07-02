@@ -19,11 +19,11 @@ stages:
 #       - HLS: ["0", "1"]
 #         CUV: ["0", "1"]
 #   script:
-#     - python3 run_tests.py --handle-log-starvation $HLS --catch-up-version $CUV
+#     - python3 tests/run_tests.py --handle-log-starvation $HLS --catch-up-version $CUV
 run_regression_tests:
   stage: build_and_test
   script:
     - echo "========================================================="
     - echo "PTL regression tests (HANDLE_LOG_STARVATION=1, CATCH_UP_VERSION=0)"
     - echo "========================================================="
-    - python3 run_tests.py --handle-log-starvation 1 --catch-up-version 0
+    - python3 tests/run_tests.py --handle-log-starvation 1 --catch-up-version 0

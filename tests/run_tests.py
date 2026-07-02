@@ -7,6 +7,11 @@ import signal
 import math
 from functools import reduce
 
+# Repo layout: this script lives in tests/, while make must run from the
+# repository root. Anchor both so the runner works from any directory.
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(TESTS_DIR)
+
 DEFAULT_QEMU_TIMEOUT = 2.0
 
 
@@ -91,9 +96,9 @@ def run_test(test_config):
     
     # 1. Compilation with test-specific flag
     compile_cmd = f"make clean && make EXTRA_CFLAGS='-DTEST_ID={test_id} -DHANDLE_LOG_STARVATION={HANDLE_LOG_STARVATION} -DCATCH_UP_VERSION={CATCH_UP_VERSION}' all"
-    compile_result = subprocess.run(compile_cmd, shell=True, capture_output=True, text=True)
+    compile_result = subprocess.run(compile_cmd, shell=True, capture_output=True, text=True, cwd=REPO_ROOT)
 
-    if compile_result.returncode != 0 or not os.path.exists("./Output/demo.elf"):
+    if compile_result.returncode != 0 or not os.path.exists(os.path.join(REPO_ROOT, "Output", "demo.elf")):
         print(f"  [!] Compilation failed for Test {test_id}")
         print("\n--- DEBUG: COMPILER OUTPUT ---")
         print(compile_result.stderr if compile_result.stderr else compile_result.stdout)
@@ -107,7 +112,7 @@ def run_test(test_config):
     
     output = ""
     try:
-        process = subprocess.Popen(qemu_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, preexec_fn=os.setsid)
+        process = subprocess.Popen(qemu_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, preexec_fn=os.setsid, cwd=REPO_ROOT)
         
         # Running with a timeout to prevent hangs. If QEMU doesn't finish in time, we kill it.
         # Each scenario can override the default via a "timeout" key in test_cases.json.
@@ -174,7 +179,7 @@ if __name__ == "__main__":
             "0 = Similar to SKIP, 1 = Similar to KILL"
         )
 
-    with open('test_cases.json', 'r') as f:
+    with open(os.path.join(TESTS_DIR, 'test_cases.json'), 'r') as f:
         data = json.load(f)
 
     schedulability_analysis(data['tests'])
@@ -189,8 +194,9 @@ if __name__ == "__main__":
 
     print("\n" + "="*40)
 
-    if os.path.exists("test.h"):
-        os.remove("test.h")
+    test_h = os.path.join(TESTS_DIR, "test.h")
+    if os.path.exists(test_h):
+        os.remove(test_h)
 
     if all_passed:
         print("FINAL STATUS: ALL TESTS PASSED")

@@ -1,0 +1,29 @@
+image: debian:bookworm-slim
+
+before_script:
+  - apt-get update -qq
+  - apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi make qemu-system-arm python3 psmisc
+
+stages:
+  - build_and_test
+
+# The oracles in test_cases.json are written for HANDLE_LOG_STARVATION=1,
+# CATCH_UP_VERSION=0: other flag combinations legitimately produce different
+# traces, so only this configuration is tested in CI.
+#
+# If one day the oracles are extended to cover every configuration, the four
+# combinations can be run as parallel jobs by re-enabling this matrix:
+#
+#   parallel:
+#     matrix:
+#       - HLS: ["0", "1"]
+#         CUV: ["0", "1"]
+#   script:
+#     - python3 run_tests.py --handle-log-starvation $HLS --catch-up-version $CUV
+run_regression_tests:
+  stage: build_and_test
+  script:
+    - echo "========================================================="
+    - echo "PTL regression tests (HANDLE_LOG_STARVATION=1, CATCH_UP_VERSION=0)"
+    - echo "========================================================="
+    - python3 run_tests.py --handle-log-starvation 1 --catch-up-version 0

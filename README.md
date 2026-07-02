@@ -1,13 +1,13 @@
 # Periodic Task Layer (PTL) for FreeRTOS
 
-> **EOS 2025 — Project 2 · Group 4**
+> **EOS 2025 - Project 2 · Group 4**
 > A priority-based scheduler for periodic tasks built on top of FreeRTOS.
 
 FreeRTOS schedules tasks by priority but has no native notion of **periodicity** or
 **deadlines**. This project adds a thin **Periodic Task Layer (PTL)** that lets users
 declare periodic tasks with a *period* and *deadline*, releases each job at the correct
 time, detects **deadline misses** and **period overruns**, and reacts to overruns with a
-configurable policy — all while leaving FreeRTOS's preemptive, priority-based scheduling
+configurable policy - all while leaving FreeRTOS's preemptive, priority-based scheduling
 completely untouched.
 
 The layer is intentionally non-intrusive: the FreeRTOS kernel is used as-is, and the
@@ -28,21 +28,18 @@ periodic behaviour is implemented entirely in user space through the FreeRTOS pu
 - [Building &amp; running](#building--running)
 - [Compile-time options](#compile-time-options)
 - [Testing &amp; regression suite](#testing--regression-suite)
-- [Continuous integration](#continuous-integration)
-- [Non-functional characteristics](#non-functional-characteristics)
-- [Authors &amp; license](#authors--license)
 
 ---
 
 ## Features
 
-- **First-class periodic tasks** — declare `(name, entry, arg, stack, priority, period, deadline, offset)` and the PTL handles the rest.
+- **First-class periodic tasks** - declare `(name, entry, arg, stack, priority, period, deadline, offset)` and the PTL handles the rest.
 - **Write only the job body** - the user provides just the code that runs *once per release*; the PTL wraps it in the release loop, so there are no hand-written `for(;;)` loops or delays.
-- **Unmodified FreeRTOS semantics** — preemptive, priority-based scheduling with round-robin time-slicing among equal-priority tasks is preserved.
-- **Tick-precise deadline &amp; overrun detection** — checks run inside the FreeRTOS tick hook (ISR context) for 1-tick resolution.
-- **Configurable overrun policy** — `SKIP`, `KILL`, or `CATCH_UP`, applied globally to all tasks.
-- **Phasing / offsets** — optional per-task start offset; by default all tasks start together at *t₀=0*.
-- **Automated, declarative test suite** — 15 scenarios described in JSON, with schedulability analysis (EDF / RM / DM) and pass/fail regression checks run under QEMU.
+- **Unmodified FreeRTOS semantics** - preemptive, priority-based scheduling with round-robin time-slicing among equal-priority tasks is preserved.
+- **Tick-precise deadline &amp; overrun detection** - checks run inside the FreeRTOS tick hook (ISR context) for 1-tick resolution.
+- **Configurable overrun policy** - `SKIP`, `KILL`, or `CATCH_UP`, applied globally to all tasks.
+- **Phasing / offsets** - optional per-task start offset; by default all tasks start together at *t₀=0*.
+- **Automated, declarative test suite** - 15 scenarios described in JSON, with schedulability analysis (EDF / RM / DM) and pass/fail regression checks run under QEMU.
 
 ## Repository layout
 
@@ -52,7 +49,7 @@ periodic behaviour is implemented entirely in user space through the FreeRTOS pu
 | [API/ptl.c](API/ptl.c) | PTL implementation: init, task-body wrapper, tick hook, overrun task, logging task. |
 | [main.c](main.c) | Entry point: initialises UART, loads a test scenario, calls `vPtlInit`. |
 | [uart.c](uart.c) / [uart.h](uart.h) | Minimal memory-mapped UART0 driver for the MPS2 board. |
-| [delay.c](delay.c) / [delay.h](delay.h) | `vDelayRoutine` — a tick-accurate busy-wait used to simulate a task's WCET. |
+| [delay.c](delay.c) / [delay.h](delay.h) | `vDelayRoutine` - a tick-accurate busy-wait used to simulate a task's WCET. |
 | [startup.c](startup.c) | Cortex-M3 startup / vector table. |
 | [mps2_m3.ld](mps2_m3.ld) | Linker script for the target board. |
 | [FreeRTOSConfig.h](FreeRTOSConfig.h) | Kernel configuration (tick rate, preemption, tick hook, heap, priorities). |
@@ -67,32 +64,32 @@ periodic behaviour is implemented entirely in user space through the FreeRTOS pu
 The PTL is composed of a handful of cooperating FreeRTOS tasks plus the kernel tick hook.
 All state lives in the global `xTaskStates[]` array, one entry per periodic task.
 
-- **`vPtlInit(SchedulerConfig)`** — the single entry point (see [API/ptl.c](API/ptl.c#L208)).
+- **`vPtlInit(SchedulerConfig)`** - the single entry point (see [API/ptl.c](API/ptl.c#L208)).
   It validates the configuration, creates the log and overrun queues, spawns one FreeRTOS
   task per periodic task (all running the wrapper below), spawns the **logging task** and the
   **overrun (interrupt) task**, and finally starts the scheduler.
 
-- **`vPtlTaskBody(void *)`** — the wrapper that every periodic task actually runs
+- **`vPtlTaskBody(void *)`** - the wrapper that every periodic task actually runs
   ([API/ptl.c](API/ptl.c#L110)). It optionally applies the start offset, then loops forever:
   it logs `START`, invokes the *user job body* once, logs `END`, and sleeps until the next
   release using `xTaskDelayUntil` (constant-cadence, jitter ≤ 1 tick). The user only writes
-  the job body — the release loop is provided by the PTL.
+  the job body - the release loop is provided by the PTL.
 
-- **`vApplicationTickHook(void)`** — the FreeRTOS tick hook ([API/ptl.c](API/ptl.c#L29)),
+- **`vApplicationTickHook(void)`** - the FreeRTOS tick hook ([API/ptl.c](API/ptl.c#L29)),
   enabled via `configUSE_TICK_HOOK`. On every tick it scans all tasks and, at ISR precision:
   - emits a `DEADLINE_MISS` event when the running job passes `release + D`;
   - detects a **period overrun** (`release + T` reached while the job is still running) and
     hands the offending task id to the overrun task through `xOverrunQueue`.
 
-- **`vPtlInterruptTask(void *)`** — deferred handler for overruns ([API/ptl.c](API/ptl.c#L64)).
+- **`vPtlInterruptTask(void *)`** - deferred handler for overruns ([API/ptl.c](API/ptl.c#L64)).
   It runs at the highest priority so it reacts promptly, advances the task's reference release
   time, and applies the configured policy (`SKIP` / `KILL` / `CATCH_UP`), logging the action.
 
-- **`vPtlLoggingTask(void *)`** — drains `xLogQueue` and formats each event into a
+- **`vPtlLoggingTask(void *)`** - drains `xLogQueue` and formats each event into a
   human-readable line printed over UART ([API/ptl.c](API/ptl.c#L160)). Doing all output from a
   single task keeps tracing thread-safe and off the ISR path.
 
-- **`uxPtlApplyKillPolicy(...)`** — deletes and re-creates a task from its configuration,
+- **`uxPtlApplyKillPolicy(...)`** - deletes and re-creates a task from its configuration,
   used by the `KILL` policy (and, optionally, by `CATCH_UP`) ([API/ptl.c](API/ptl.c#L9)).
 
 ### Priority mapping
@@ -124,7 +121,7 @@ follow the assignment terminology:
 
 A schedule is described entirely by two structures declared in [API/ptl.h](API/ptl.h).
 
-**Global — `SchedulerConfig`:**
+**Global - `SchedulerConfig`:**
 
 | Field | Type | Meaning |
 |-------|------|---------|
@@ -134,7 +131,7 @@ A schedule is described entirely by two structures declared in [API/ptl.h](API/p
 | `pxTasks` | `TaskConfig *` | Array of task configurations. |
 | `xNumTasks` | `int` | Number of valid entries in `pxTasks[]`. |
 
-**Per task — `TaskConfig`:**
+**Per task - `TaskConfig`:**
 
 | Field | Type | Meaning |
 |-------|------|---------|
@@ -281,9 +278,9 @@ The runner ([run_tests.py](run_tests.py)) will:
 
 1. Prompt for the `HANDLE_LOG_STARVATION` and `CATCH_UP_VERSION` flags.
 2. Print a **schedulability analysis** for every scenario:
-   - **EDF** — necessary &amp; sufficient utilisation bound `U ≤ 1`.
-   - **RM** — sufficient hyperbolic bound `∏(Uᵢ + 1) ≤ 2`.
-   - **DM** — necessary &amp; sufficient response-time analysis.
+   - **EDF** - necessary &amp; sufficient utilisation bound `U ≤ 1`.
+   - **RM** - sufficient hyperbolic bound `∏(Uᵢ + 1) ≤ 2`.
+   - **DM** - necessary &amp; sufficient response-time analysis.
 3. Generate `test.h` from the JSON via [generate_tests.py](generate_tests.py).
 4. For each scenario: `make clean && make -DTEST_ID=<n> …`, run it under QEMU (with a timeout),
    capture the serial trace, and check it against the `must_have` / `must_not_have` oracle.

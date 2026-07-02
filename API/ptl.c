@@ -239,8 +239,16 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig)
     {
         TaskConfig *pxTaskConfig = (xSchedulerConfig.pxTasks + i);
 
-        /* If the deadline is not specified (negative values or 0), the deadline is set to the same value of the period */
-        if (pxTaskConfig->ulDeadline <= 0)
+        /* Check if the task period is valid */
+        if (pxTaskConfig->ulPeriodMs <= 0)
+        {
+            vUartPrintf("[ERROR] Task period must be greater than 0.\n");
+            while (1)
+                ;
+        }
+
+        /* If the deadline is less than 0 or greater than period, it is set to the same value of the period */
+        if (pxTaskConfig->ulDeadline <= 0 || pxTaskConfig->ulDeadline > pxTaskConfig->ulPeriodMs)
         {
             pxTaskConfig->ulDeadline = pxTaskConfig->ulPeriodMs;
         }

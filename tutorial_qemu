@@ -1,7 +1,0 @@
-Open 2 terminal;
-use the command "make";
-In the first terminal, run "make qemu_debug" to start QEMU in debug mode;
-In the second terminal, run "make gdb_start".
-In GBD, use the command "target remote localhost:1234" to connect to QEMU;
-Use "break" + "function_name" to set a breakpoint at the function selected before, then "continue" to start execution.
-Then, use the command "continue" or "step" to step through the code and observe the behavior of the scheduler and tasks.

@@ -85,7 +85,7 @@ typedef enum
 typedef struct
 {
     TickType_t xTimestamp;   /* Tick at which the event occurred */
-    int xTaskId;             /* Index of the task in xTaskStates[] to which the event relates */
+    BaseType_t xTaskId;      /* Index of the task in xTaskStates[] to which the event relates */
     LogEventType eEventType; /* Type of the event (START, END, DEADLINE_MISS, etc.) */
     uint32_t ulMissedJob;    /* Missed job to log when CATCH-UP policy is enabled */
 } LogEvent;
@@ -94,7 +94,7 @@ typedef struct
 typedef struct
 {
     char pcName[configMAX_TASK_NAME_LEN]; /* Human-readable task name */
-    int xIdTask;                          /* Task index, assigned by the PTL during vPtlInit */
+    BaseType_t xIdTask;                   /* Task index, assigned by the PTL during vPtlInit */
     void (*pxTaskBody)(void *);           /* User job body, executed once per release */
     void *pvParams;                       /* Argument passed to pxTaskBody on each invocation */
     uint16_t usStackDepth;                /* Stack depth (in words) for the task */
@@ -127,10 +127,10 @@ typedef struct
    vPtlInit, listing all periodic tasks and global scheduler settings. */
 typedef struct
 {
-    TaskPolicy ePolicy;  /* Global overrun policy applied to all tasks */
-    int xMaxTasks;       /* Maximum number of tasks allowed */
-    TaskConfig *pxTasks; /* Array of task configurations */
-    int xNumTasks;       /* Number of valid entries in pxTasks[] */
+    TaskPolicy ePolicy;   /* Global overrun policy applied to all tasks */
+    BaseType_t xMaxTasks; /* Maximum number of tasks allowed */
+    TaskConfig *pxTasks;  /* Array of task configurations */
+    BaseType_t xNumTasks; /* Number of valid entries in pxTasks[] */
 } SchedulerConfig;
 
 /* Global variables for logging and task state management */
@@ -157,7 +157,7 @@ void vPtlInit(const SchedulerConfig xSchedulerConfig);
  * - xTaskId: Index of the task in the xTaskStates[] array.
  * Returns 1 (the number of jobs discarded by the kill).
  */
-UBaseType_t uxPtlApplyKillPolicy(volatile TaskConfig *pxTaskConfig, int xTaskId);
+UBaseType_t uxPtlApplyKillPolicy(volatile TaskConfig *pxTaskConfig, BaseType_t xTaskId);
 
 /*
  * Wrapper executed as the body of every periodic task. It handles release

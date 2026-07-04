@@ -126,17 +126,20 @@ A schedule is described entirely by two structures declared in [API/ptl.h](API/p
 | Field | Type | Meaning |
 |-------|------|---------|
 | `ePolicy` | `TaskPolicy` | Overrun policy applied to all tasks (`POLICY_SKIP` / `POLICY_KILL` / `POLICY_CATCH_UP`). |
-| `xTraceEnabled` | `int` | Non-zero to enable trace output. |
-| `xMaxTasks` | `int` | Maximum number of tasks allowed (≤ `MAX_TASKS`, which is 8). |
+| `xMaxTasks` | `BaseType_t` | Maximum number of tasks allowed (≤ `MAX_TASKS`, which is 8). |
 | `pxTasks` | `TaskConfig *` | Array of task configurations. |
-| `xNumTasks` | `int` | Number of valid entries in `pxTasks[]`. |
+| `xNumTasks` | `BaseType_t` | Number of valid entries in `pxTasks[]`. |
+
+> Tracing is not a runtime configuration field: it is enabled at compile time through the
+> `TRACE_ENABLED` flag (default `1`), which compiles the whole trace path in or out — see
+> [Compile-time options](#compile-time-options).
 
 **Per task - `TaskConfig`:**
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | `pcName` | `char[]` | Human-readable task name. |
-| `xIdTask` | `int` | Task index (assigned by the PTL during init). |
+| `xIdTask` | `BaseType_t` | Task index (assigned by the PTL during init). |
 | `pxTaskBody` | `void (*)(void *)` | User job body, executed once per release. |
 | `pvParams` | `void *` | Argument passed to the job body on each invocation. |
 | `usStackDepth` | `uint16_t` | Stack depth in words. |
@@ -157,11 +160,10 @@ TaskConfig xTasks[MAX_TASKS] = {
 };
 
 SchedulerConfig xCfg = {
-    .ePolicy       = POLICY_SKIP,
-    .xTraceEnabled = 1,
-    .xMaxTasks     = MAX_TASKS,
-    .pxTasks       = xTasks,
-    .xNumTasks     = 2,
+    .ePolicy   = POLICY_SKIP,
+    .xMaxTasks = MAX_TASKS,
+    .pxTasks   = xTasks,
+    .xNumTasks = 2,
 };
 
 vPtlInit(xCfg);   /* defines t0, starts all tasks, never returns */

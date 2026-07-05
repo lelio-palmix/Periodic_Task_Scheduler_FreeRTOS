@@ -1,6 +1,6 @@
 # Periodic Task Layer (PTL) for FreeRTOS
 
-> **EOS 2025 - Project 2 · Group 4**
+> **EOS 2026 - Project 2 · Group 4**
 > A priority-based scheduler for periodic tasks built on top of FreeRTOS.
 
 FreeRTOS schedules tasks by priority but has no native notion of **periodicity** or
@@ -25,6 +25,7 @@ periodic behaviour is implemented entirely in user space through the FreeRTOS pu
 - [Configuration interface](#configuration-interface)
 - [Overrun policies](#overrun-policies)
 - [Trace &amp; monitoring output](#trace--monitoring-output)
+- [Error handling](#error-handling)
 - [Building &amp; running](#building--running)
 - [Compile-time options](#compile-time-options)
 - [Testing &amp; regression suite](#testing--regression-suite)
@@ -64,33 +65,33 @@ periodic behaviour is implemented entirely in user space through the FreeRTOS pu
 The PTL is composed of a handful of cooperating FreeRTOS tasks plus the kernel tick hook.
 All state lives in the global `xTaskStates[]` array, one entry per periodic task.
 
-- **`vPtlInit(SchedulerConfig)`** - the single entry point (see [API/ptl.c](API/ptl.c#L208)).
+- **`vPtlInit(SchedulerConfig)`** - the single entry point (see [API/ptl.c](API/ptl.c#L237)).
   It validates the configuration, creates the log and overrun queues, spawns one FreeRTOS
   task per periodic task (all running the wrapper below), spawns the **logging task** and the
   **overrun (interrupt) task**, and finally starts the scheduler.
 
 - **`vPtlTaskBody(void *)`** - the wrapper that every periodic task actually runs
-  ([API/ptl.c](API/ptl.c#L110)). It optionally applies the start offset, then loops forever:
+  ([API/ptl.c](API/ptl.c#L131)). It optionally applies the start offset, then loops forever:
   it logs `START`, invokes the *user job body* once, logs `END`, and sleeps until the next
   release using `xTaskDelayUntil` (constant-cadence, jitter ≤ 1 tick). The user only writes
   the job body - the release loop is provided by the PTL.
 
-- **`vApplicationTickHook(void)`** - the FreeRTOS tick hook ([API/ptl.c](API/ptl.c#L29)),
+- **`vApplicationTickHook(void)`** - the FreeRTOS tick hook ([API/ptl.c](API/ptl.c#L36)),
   enabled via `configUSE_TICK_HOOK`. On every tick it scans all tasks and, at ISR precision:
   - emits a `DEADLINE_MISS` event when the running job passes `release + D`;
   - detects a **period overrun** (`release + T` reached while the job is still running) and
     hands the offending task id to the overrun task through `xOverrunQueue`.
 
-- **`vPtlInterruptTask(void *)`** - deferred handler for overruns ([API/ptl.c](API/ptl.c#L64)).
+- **`vPtlInterruptTask(void *)`** - deferred handler for overruns ([API/ptl.c](API/ptl.c#L84)).
   It runs at the highest priority so it reacts promptly, advances the task's reference release
   time, and applies the configured policy (`SKIP` / `KILL` / `CATCH_UP`), logging the action.
 
 - **`vPtlLoggingTask(void *)`** - drains `xLogQueue` and formats each event into a
-  human-readable line printed over UART ([API/ptl.c](API/ptl.c#L160)). Doing all output from a
+  human-readable line printed over UART ([API/ptl.c](API/ptl.c#L181)). Doing all output from a
   single task keeps tracing thread-safe and off the ISR path.
 
 - **`uxPtlApplyKillPolicy(...)`** - deletes and re-creates a task from its configuration,
-  used by the `KILL` policy (and, optionally, by `CATCH_UP`) ([API/ptl.c](API/ptl.c#L9)).
+  used by the `KILL` policy (and, optionally, by `CATCH_UP`) ([API/ptl.c](API/ptl.c#L13)).
 
 ### Priority mapping
 
@@ -176,7 +177,7 @@ vPtlInit(xCfg);   /* defines t0, starts all tasks, never returns */
 ## Overrun policies
 
 When a job is still running at its next release, the PTL applies one globally selected policy
-(handled in [`vPtlInterruptTask`](API/ptl.c#L64)):
+(handled in [`vPtlInterruptTask`](API/ptl.c#L84)):
 
 | Policy | Behaviour | Log |
 |--------|-----------|-----|
@@ -190,7 +191,7 @@ The `CATCH_UP` behaviour has two flavours selectable at compile time via `CATCH_
 ## Trace &amp; monitoring output
 
 The logging task prints one line per event over UART with tick-level timestamps. The exact
-formats emitted by [`vPtlLoggingTask`](API/ptl.c#L161) are:
+formats emitted by [`vPtlLoggingTask`](API/ptl.c#L181) are:
 
 ```
 [INFO] t=<tick> task=<name> START
@@ -199,10 +200,16 @@ formats emitted by [`vPtlLoggingTask`](API/ptl.c#L161) are:
 [WARN] t=<tick> task=<name> OVERRUN -> SKIP
 [WARN] t=<tick> task=<name> OVERRUN -> CATCH_UP
 [WARN] t=<tick> task=<name> OVERRUN -> KILL
+[INFO] t=<tick> IDLE ticks=<idle_ticks>/<window> (<pct>%)
 ```
 
-The trace captures task start/end ticks and deadline misses / forced terminations, providing a
-tick-resolution timeline suitable for validation and regression checking.
+The trace captures task start/end ticks, deadline misses / forced terminations and CPU idle
+time, providing a tick-resolution timeline suitable for validation and regression checking.
+
+**CPU idle time** is measured through the FreeRTOS idle hook (`vApplicationIdleHook`,
+`configUSE_IDLE_HOOK = 1`): each tick during which the idle task runs is counted as idle. Every
+`IDLE_REPORT_PERIOD` ticks (default 1000, i.e. once per second) an `IDLE` line reports the idle
+total for the window.
 
 Tracing is controlled by the `TRACE_ENABLED` define ([API/ptl.h](API/ptl.h#L40-L46), default `1`).
 Building with `TRACE_ENABLED=0` compiles tracing out entirely - no events are queued, and the log
@@ -212,8 +219,24 @@ queue and the logging task are not created - so the scheduler runs with zero tra
 make EXTRA_CFLAGS="-DTRACE_ENABLED=0" all
 ```
 
-Fatal `[ERROR]` messages from `vPtlInit` are always printed, regardless of `TRACE_ENABLED`.
-See [Compile-time options](#compile-time-options) for the full list of build flags.
+Fatal conditions are reported regardless of `TRACE_ENABLED`: the error hooks and `configASSERT`
+write straight to the UART (not through the trace queue), so a setup failure in `vPtlInit` is
+visible even when tracing is compiled out: see [Error handling](#error-handling).
+
+## Error handling
+
+Every fatal condition is routed through a dedicated hook function, FreeRTOS style. All hooks
+print an `[ERROR]` line on the UART and then halt with interrupts disabled:
+
+| Hook | Trigger | Enabled by |
+|------|---------|-----------|
+| `vApplicationMallocFailedHook` | `pvPortMalloc()` fails (FreeRTOS heap exhausted). | `configUSE_MALLOC_FAILED_HOOK = 1` |
+| `vApplicationStackOverflowHook` | Stack overflow detected on a context switch; reports the task name. | `configCHECK_FOR_STACK_OVERFLOW = 2` |
+| `vApplicationAssertHandler` | A kernel or application `configASSERT()` fails; reports the source line. | `configASSERT` in [FreeRTOSConfig.h](FreeRTOSConfig.h#L111) |
+
+The hooks are defined in [API/ptl.c](API/ptl.c#L353). Internally, `vPtlInit` uses `configASSERT`
+to validate every queue and task creation and the task configuration, so any setup failure is
+caught at the point it happens rather than surfacing later.
 
 ## Building &amp; running
 
@@ -233,11 +256,11 @@ On Debian/Ubuntu:
 sudo apt-get install gcc-arm-none-eabi libnewlib-arm-none-eabi make qemu-system-arm python3 gdb-multiarch
 ```
 
-### Build
+### Build (w/ user defined tasks)
 
 ```sh
 make clean      # remove build artifacts
-make            # compile and link -> Output/demo.elf
+make all           # compile and link -> Output/demo.elf
 ```
 
 To build a specific scenario from the test suite, pass its id (see
@@ -259,8 +282,8 @@ make qemu_start   # run Output/demo.elf
 
 ## Compile-time options
 
-Three behaviours are selectable at build time through `-D` flags (defaults in
-[API/ptl.h](API/ptl.h#L26-L46)):
+The behaviours below are selectable at build time through `-D` flags (defaults in
+[API/ptl.h](API/ptl.h#L26-L52)):
 
 | Flag | Values | Default | Effect |
 |------|--------|---------|--------|
@@ -268,6 +291,7 @@ Three behaviours are selectable at build time through `-D` flags (defaults in
 | `HANDLE_LOG_STARVATION` | `0` / `1` | `1` | `1`: logging task runs at the highest user priority to avoid dropped logs under load. `0`: logging task runs at priority 1. |
 | `CATCH_UP_VERSION` | `0` / `1` | `0` | `0`: on overrun just log and advance the release (SKIP-like). `1`: kill the current job, release a fresh one, and log the previous job as missed (KILL-like). |
 | `TRACE_ENABLED` | `0` / `1` | `1` | `1`: trace events are queued and printed on the UART by the logging task. `0`: tracing is compiled out entirely — no log queue, no logging task, zero runtime overhead. |
+| `IDLE_REPORT_PERIOD` | ticks | `1000` | Width of the window (in ticks) over which idle time is accumulated before an `IDLE` trace line is emitted. Only meaningful with `TRACE_ENABLED=1`. |
 
 Example:
 

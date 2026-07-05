@@ -45,7 +45,7 @@
 //Enable Round-Robin among tasks with same priority
 #define configUSE_TIME_SLICING                   1
 #define configUSE_PREEMPTION                     1
-#define configUSE_IDLE_HOOK                      0
+#define configUSE_IDLE_HOOK                      1
 #define configUSE_TICK_HOOK                      1//Start vApplicationTickHook
 #define configCPU_CLOCK_HZ                       ( ( unsigned long ) 25000000 )
 #define configTICK_RATE_HZ                       ( ( TickType_t ) 1000 )
@@ -57,8 +57,8 @@
 #define configUSE_CO_ROUTINES                    0
 #define configUSE_MUTEXES                        1
 #define configUSE_RECURSIVE_MUTEXES              1
-#define configCHECK_FOR_STACK_OVERFLOW           0
-#define configUSE_MALLOC_FAILED_HOOK             0
+#define configCHECK_FOR_STACK_OVERFLOW           2
+#define configUSE_MALLOC_FAILED_HOOK             1
 #define configUSE_QUEUE_SETS                     1
 #define configUSE_COUNTING_SEMAPHORES            1
 
@@ -90,6 +90,7 @@
 #define INCLUDE_xTaskGetSchedulerState            1
 #define INCLUDE_xTimerGetTimerDaemonTaskHandle    1
 #define INCLUDE_xTaskGetIdleTaskHandle            1
+#define INCLUDE_xTaskGetCurrentTaskHandle         0
 #define INCLUDE_xSemaphoreGetMutexHolder          1
 #define INCLUDE_eTaskGetState                     1
 #define INCLUDE_xTimerPendFunctionCall            1
@@ -105,7 +106,9 @@
 #define configKERNEL_INTERRUPT_PRIORITY           ( 255 )        /* All eight bits as QEMU doesn't model the priority bits. */
 
 #ifndef __IASMARM__ /* Prevent C code being included in IAR asm files. */
-	#define configASSERT( x ) if( ( x ) == 0 ) while(1);
+    /* Custom handler for assert logging via UART */
+    extern void vApplicationAssertHandler( uint32_t ulLine );
+    #define configASSERT( x ) if( ( x ) == 0 ) { vApplicationAssertHandler( __LINE__ ); }
 #endif
 
 

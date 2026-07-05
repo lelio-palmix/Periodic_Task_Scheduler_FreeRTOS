@@ -45,6 +45,13 @@
 #define TRACE_ENABLED 1
 #endif
 
+/* Width, in ticks, of the window over which CPU idle time is accumulated
+** before a LOG_IDLE trace event.
+** Can be overridden at compile time via -DIDLE_REPORT_PERIOD=<ticks> */
+#ifndef IDLE_REPORT_PERIOD
+#define IDLE_REPORT_PERIOD 1000
+#endif
+
 /* Trace macros: forward a LogEvent to the log queue when tracing is enabled;
    compile to no-ops when disabled. */
 #if (TRACE_ENABLED == 1)
@@ -78,7 +85,8 @@ typedef enum
     LOG_DEADLINE_MISS,
     LOG_OVERRUN_SKIP,
     LOG_OVERRUN_CATCHUP,
-    LOG_OVERRUN_KILL
+    LOG_OVERRUN_KILL,
+    LOG_IDLE
 } LogEventType;
 
 /* Log event structure */
@@ -88,6 +96,7 @@ typedef struct
     BaseType_t xTaskId;      /* Index of the task in xTaskStates[] to which the event relates */
     LogEventType eEventType; /* Type of the event (START, END, DEADLINE_MISS, etc.) */
     uint32_t ulMissedJob;    /* Missed job to log when CATCH-UP policy is enabled */
+    uint32_t ulIdleTicks;    /* Idle ticks accumulated in the report window (LOG_IDLE only) */
 } LogEvent;
 
 /* Task configuration structure */
@@ -119,8 +128,8 @@ typedef struct
     TickType_t xPeriod;                   /* Period T, in ticks */
     TickType_t xDeadline;                 /* Relative deadline D, in ticks */
     uint32_t ulK;                         /* Index of the current job (release counter) */
-    short sLastKDeadlineMiss;             /* Job index for which a deadline miss was
-                                             last logged, to avoid duplicate miss logs */
+    BaseType_t xDeadlineMissLogged;       /* pdTRUE once the miss for the current job has
+                                             been logged; reset to pdFALSE at each release */
 } TaskState;
 
 /* Scheduler configuration structure: the top-level configuration passed to

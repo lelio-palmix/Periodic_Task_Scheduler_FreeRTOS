@@ -1,7 +1,6 @@
 # Periodic Task Layer (PTL) for FreeRTOS
 
-> **EOS 2026 - Project 2 · Group 4**
-> A priority-based scheduler for periodic tasks built on top of FreeRTOS.
+![Polito Logo](logo_polito.jpg)
 
 FreeRTOS schedules tasks by priority but has no native notion of **periodicity** or
 **deadlines**. This project adds a thin **Periodic Task Layer (PTL)** that lets users
@@ -13,6 +12,9 @@ completely untouched.
 The layer is intentionally non-intrusive: the FreeRTOS kernel is used as-is, and the
 periodic behaviour is implemented entirely in user space through the FreeRTOS public API
 (tasks, queues, and the tick hook). This keeps the PTL easy to port across FreeRTOS ports.
+
+This project was developed for the **Embedded Operating Systems** exam of the MSc in
+**Cybersecurity Engineering** at [Politecnico di Torino](https://www.polito.it/). 
 
 ---
 

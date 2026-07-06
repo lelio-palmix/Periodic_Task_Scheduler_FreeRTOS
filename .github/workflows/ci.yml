@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # The oracles in test_cases.json are written for HANDLE_LOG_STARVATION=1,
+  # CATCH_UP_VERSION=0: other flag combinations legitimately produce different
+  # traces, so only this configuration is tested in CI.
+  #
+  # If one day the oracles are extended to cover every configuration, the four
+  # combinations can be run as a matrix by re-enabling:
+  #
+  #   strategy:
+  #     matrix:
+  #       hls: ["0", "1"]
+  #       cuv: ["0", "1"]
+  #   ...
+  #   run: python3 tests/run_tests.py --handle-log-starvation ${{ matrix.hls }} --catch-up-version ${{ matrix.cuv }}
+  run_regression_tests:
+    name: PTL regression tests
+    runs-on: ubuntu-latest
+    container: debian:bookworm-slim
+
+    steps:
+      - name: Install toolchain
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            gcc-arm-none-eabi libnewlib-arm-none-eabi make qemu-system-arm python3 psmisc git
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run regression tests (HANDLE_LOG_STARVATION=1, CATCH_UP_VERSION=0)
+        run: python3 tests/run_tests.py --handle-log-starvation 1 --catch-up-version 0
